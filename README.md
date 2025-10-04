@@ -7,7 +7,7 @@
 [![codecov](https://codecov.io/gh/bsbodden/mfcqi/graph/badge.svg)](https://codecov.io/gh/bsbodden/mfcqi)
 ![Downloads](https://img.shields.io/pypi/dm/mfcqi)
 
-![logo](docs/mfcqi.png)
+![logo](https://raw.githubusercontent.com/bsbodden/mfcqi/main/docs/mfcqi.png)
 
 **MFCQI** (Multi-Factor Code Quality Index) is a comprehensive code quality analysis tool that produces a single quality
 score (0.0-1.0) by combining multiple evidence-based metrics.
