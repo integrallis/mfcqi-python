@@ -148,20 +148,28 @@ jobs:
         #   package because VERSION will not have been uploaded to regular PyPI yet.
         # - --index-strategy unsafe-best-match allows UV to find dependencies
         #   (like setuptools) from all indexes, not just the first one
-        # - attempt install again after 5 seconds if it fails because there is
-        #   sometimes a delay in availability on test pypi
+        # - Retry up to 3 times with increasing delays (10s, 20s, 30s) because
+        #   Test PyPI can have propagation delays
         run: |
-          uv pip install --system \
-            --index-strategy unsafe-best-match \
-            --extra-index-url https://test.pypi.org/simple/ \
-            "mfcqi==$VERSION" || \
-          ( \
-            sleep 5 && \
-            uv pip install --system \
+          for attempt in 1 2 3; do
+            echo "Attempt $attempt of 3..."
+            if uv pip install --system \
               --index-strategy unsafe-best-match \
               --extra-index-url https://test.pypi.org/simple/ \
-              "mfcqi==$VERSION" \
-          )
+              "mfcqi==$VERSION"; then
+              echo "✅ Successfully installed mfcqi==$VERSION"
+              exit 0
+            fi
+
+            if [ $attempt -lt 3 ]; then
+              delay=$((attempt * 10))
+              echo "⏳ Install failed, waiting ${delay}s before retry..."
+              sleep $delay
+            fi
+          done
+
+          echo "❌ Failed to install after 3 attempts"
+          exit 1
 
       - name: Verify package import
         env:
