@@ -18,8 +18,11 @@ Core metrics include:
 - Code Smell Density (PyExamine + AST test smells)
 """
 
+import logging
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from mfcqi.core.file_utils import get_python_files
 from mfcqi.core.paradigm_detector import ParadigmDetector
@@ -297,7 +300,9 @@ class MFCQICalculator:
                     if metric_name == "cyclomatic_complexity":
                         tool_outputs["complex_functions"] = self._get_complex_functions(codebase)
 
-            except Exception:
+            except Exception as e:
+                # Log metric extraction failure (graceful degradation to 0.0)
+                logger.debug(f"Metric '{metric_name}' extraction failed: {e}. Using 0.0")
                 results[metric_name] = 0.0
 
         # Calculate overall score
@@ -337,14 +342,18 @@ class MFCQICalculator:
                                     "type": item_type,
                                 }
                             )
-                except Exception:
+                except Exception as e:
+                    # Log file processing failure (graceful degradation, continue with other files)
+                    logger.debug(f"Failed to analyze complexity for {py_file}: {e}")
                     continue
 
             # Sort by complexity and return top N
             complex_functions.sort(key=lambda x: x["complexity"], reverse=True)
             return complex_functions[:limit]
 
-        except Exception:
+        except Exception as e:
+            # Log failure to collect complex functions (graceful degradation)
+            logger.debug(f"Failed to collect complex functions: {e}")
             return []
 
     def _calculate_geometric_mean(self, values: list[float]) -> float:
