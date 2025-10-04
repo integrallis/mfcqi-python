@@ -2,10 +2,10 @@
 
 [![MFCQI Score](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/bsbodden/mfcqi/main/.github/badges/mfcqi.json)](https://github.com/bsbodden/mfcqi)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![PyPI version](https://badge.fury.io/py/mfcqi.svg)](https://badge.fury.io/py/mfcqi)
+[![PyPI version](https://badge.fury.io/py/mfcqi.svg)](https://pypi.org/project/mfcqi)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![codecov](https://codecov.io/gh/bsbodden/mfcqi/graph/badge.svg)](https://codecov.io/gh/bsbodden/mfcqi)
-[![Downloads](https://pepy.tech/badge/mfcqi)](https://pepy.tech/project/mfcqi)
+![Downloads](https://img.shields.io/pypi/dm/mfcqi)
 
 ![logo](docs/mfcqi.png)
 
