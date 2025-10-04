@@ -88,8 +88,9 @@ class LLMHandler:
                     "models_detailed": models_detailed,
                     "endpoint": self.ollama_endpoint,
                 }
-        except Exception:
-            pass
+        except Exception as e:
+            # Log Ollama connection errors for debugging (graceful degradation intended)
+            logger.debug(f"Ollama not available at {self.ollama_endpoint}: {e}")
 
         return {
             "available": False,

@@ -2,11 +2,14 @@
 Configuration manager with secure key storage.
 """
 
+import logging
 import os
 from pathlib import Path
 from typing import Any
 
 import toml
+
+logger = logging.getLogger(__name__)
 
 # Check if keyring should be disabled (e.g., for testing)
 if os.getenv("MFCQI_DISABLE_KEYRING"):
@@ -105,8 +108,9 @@ class ConfigManager:
                 key = keyring.get_password("mfcqi", f"{provider}_api_key")
                 if key:
                     return key
-            except Exception:
-                pass
+            except Exception as e:
+                # Log keyring errors for debugging (graceful degradation intended)
+                logger.debug(f"Keyring error for {provider}: {e}. Falling back to environment variable.")
 
         # Fallback to environment variables
         env_var = f"{provider.upper()}_API_KEY"
