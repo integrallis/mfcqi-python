@@ -1,6 +1,6 @@
 [project]
 name = "mfcqi"
-version = "0.0.2"
+version = "0.0.3"
 description = "MFCQI - Benchmark Analysis Reporting Utility for comprehensive code quality analysis with LLM integration"
 readme = "README.md"
 license = { text = "MIT" }
