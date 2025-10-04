@@ -85,9 +85,7 @@ class PipAuditAnalyzer:
 
             # Validate auditor is initialized (safer than assert which can be disabled with -O)
             if self.auditor is None:
-                raise RuntimeError(
-                    "pip-audit auditor not initialized despite _available=True"
-                )
+                raise RuntimeError("pip-audit auditor not initialized despite _available=True")
 
             # Run audit using Python API
             audit_results = self.auditor.audit(source)
@@ -147,9 +145,7 @@ class PipAuditAnalyzer:
 
             # Validate auditor is initialized (safer than assert which can be disabled with -O)
             if self.auditor is None:
-                raise RuntimeError(
-                    "pip-audit auditor not initialized despite _available=True"
-                )
+                raise RuntimeError("pip-audit auditor not initialized despite _available=True")
 
             # Run audit using Python API
             audit_results = self.auditor.audit(source)

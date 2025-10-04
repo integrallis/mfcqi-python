@@ -6,10 +6,10 @@ import logging
 from pathlib import Path
 from typing import Any, Union, cast
 
-logger = logging.getLogger(__name__)
-
 from mfcqi.core.file_utils import get_python_files
 from mfcqi.core.metric import Metric
+
+logger = logging.getLogger(__name__)
 
 
 class CodeDuplication(Metric):

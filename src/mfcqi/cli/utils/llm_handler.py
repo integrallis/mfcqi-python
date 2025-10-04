@@ -2,6 +2,7 @@
 LLM handler with model selection and Ollama integration.
 """
 
+import logging
 import time
 from typing import Any
 
@@ -13,6 +14,7 @@ from mfcqi.analysis.config import AnalysisConfig
 from mfcqi.cli.utils.config_manager import ConfigManager
 
 console = Console()
+logger = logging.getLogger(__name__)
 
 
 class LLMHandler:

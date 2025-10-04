@@ -37,12 +37,12 @@ import logging
 from pathlib import Path
 from typing import Any, Union
 
-logger = logging.getLogger(__name__)
-
 from cognitive_complexity.api import get_cognitive_complexity
 
 from mfcqi.core.file_utils import get_python_files
 from mfcqi.core.metric import Metric
+
+logger = logging.getLogger(__name__)
 
 
 class CognitiveComplexity(Metric):
@@ -167,7 +167,9 @@ class CognitiveComplexity(Metric):
 
                         except Exception as e:
                             # Log function analysis failure (graceful degradation)
-                            logger.debug(f"Failed to analyze function '{node.name}' in {py_file}: {e}")
+                            logger.debug(
+                                f"Failed to analyze function '{node.name}' in {py_file}: {e}"
+                            )
                             continue
 
             except Exception as e:

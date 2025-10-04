@@ -330,7 +330,7 @@ def complex_function(a, b, c, d):
         ):
             result = self.runner.invoke(
                 cli,
-                ["analyze", str(self.temp_dir)],  # NOT --silent
+                ["analyze", str(self.temp_dir), "--model", "gpt-4o"],  # Explicitly request LLM
             )
 
             # Should continue with metrics-only (exit code 0)

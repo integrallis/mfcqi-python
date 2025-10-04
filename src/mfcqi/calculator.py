@@ -22,8 +22,6 @@ import logging
 from pathlib import Path
 from typing import Any
 
-logger = logging.getLogger(__name__)
-
 from mfcqi.core.file_utils import get_python_files
 from mfcqi.core.paradigm_detector import ParadigmDetector
 from mfcqi.metrics.code_smell import CodeSmellDensity
@@ -43,6 +41,8 @@ from mfcqi.metrics.security import SecurityMetric
 from mfcqi.metrics.type_safety import TypeSafetyMetric
 from mfcqi.smell_detection.ast_test_smells import ASTTestSmellDetector
 from mfcqi.smell_detection.pyexamine import PyExamineDetector
+
+logger = logging.getLogger(__name__)
 
 
 class MFCQICalculator:

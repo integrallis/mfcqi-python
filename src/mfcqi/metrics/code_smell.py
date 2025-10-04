@@ -19,12 +19,12 @@ import logging
 from pathlib import Path
 from typing import Any, Union, cast
 
-logger = logging.getLogger(__name__)
-
 from mfcqi.core.file_utils import get_python_files
 from mfcqi.core.metric import Metric
 from mfcqi.smell_detection.aggregator import SmellAggregator
 from mfcqi.smell_detection.detector_base import SmellDetector
+
+logger = logging.getLogger(__name__)
 
 
 class CodeSmellDensity(Metric):

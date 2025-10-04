@@ -110,7 +110,9 @@ class ConfigManager:
                     return key
             except Exception as e:
                 # Log keyring errors for debugging (graceful degradation intended)
-                logger.debug(f"Keyring error for {provider}: {e}. Falling back to environment variable.")
+                logger.debug(
+                    f"Keyring error for {provider}: {e}. Falling back to environment variable."
+                )
 
         # Fallback to environment variables
         env_var = f"{provider.upper()}_API_KEY"
