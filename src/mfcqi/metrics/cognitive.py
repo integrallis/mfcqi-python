@@ -33,8 +33,11 @@ References:
 """
 
 import ast
+import logging
 from pathlib import Path
 from typing import Any, Union
+
+logger = logging.getLogger(__name__)
 
 from cognitive_complexity.api import get_cognitive_complexity
 
@@ -162,12 +165,14 @@ class CognitiveComplexity(Metric):
                             if complexity >= self.hotspot_threshold:
                                 hotspots.append(func_info)
 
-                        except Exception:
-                            # Skip functions that can't be analyzed
+                        except Exception as e:
+                            # Log function analysis failure (graceful degradation)
+                            logger.debug(f"Failed to analyze function '{node.name}' in {py_file}: {e}")
                             continue
 
-            except Exception:
-                # Skip files that can't be parsed
+            except Exception as e:
+                # Log file parsing failure (graceful degradation)
+                logger.debug(f"Failed to parse {py_file} for cognitive complexity: {e}")
                 continue
 
         # Sort hotspots by complexity (worst first)
