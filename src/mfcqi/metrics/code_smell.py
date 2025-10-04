@@ -15,8 +15,11 @@ Key References:
 
 """
 
+import logging
 from pathlib import Path
 from typing import Any, Union, cast
+
+logger = logging.getLogger(__name__)
 
 from mfcqi.core.file_utils import get_python_files
 from mfcqi.core.metric import Metric
@@ -192,7 +195,9 @@ class CodeSmellDensity(Metric):
                     if stripped and not stripped.startswith("#"):
                         total_loc += 1
 
-            except Exception:
+            except Exception as e:
+                # Log file reading failure (graceful degradation, continue with other files)
+                logger.debug(f"Failed to read {py_file} for LOC counting: {e}")
                 continue
 
         return total_loc
