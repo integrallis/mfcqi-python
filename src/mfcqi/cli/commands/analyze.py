@@ -69,7 +69,9 @@ def analyze(
         silent = True
 
     # Determine if we should skip LLM
-    should_skip_llm = skip_llm or metrics_only
+    # Skip by default UNLESS user explicitly requested via --model or --provider
+    explicitly_requested_llm = model is not None or provider is not None
+    should_skip_llm = (skip_llm or metrics_only) or not explicitly_requested_llm
 
     # Initialize components
     config_manager = ConfigManager()
