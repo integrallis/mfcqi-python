@@ -83,8 +83,13 @@ class PipAuditAnalyzer:
             # Create dependency source from requirements file
             source = RequirementSource([requirements_file])
 
+            # Validate auditor is initialized (safer than assert which can be disabled with -O)
+            if self.auditor is None:
+                raise RuntimeError(
+                    "pip-audit auditor not initialized despite _available=True"
+                )
+
             # Run audit using Python API
-            assert self.auditor is not None  # Type guard: auditor exists when _available=True
             audit_results = self.auditor.audit(source)
 
             # Convert results to our format
@@ -140,8 +145,13 @@ class PipAuditAnalyzer:
             # Create dependency source from pyproject.toml
             source = PyProjectSource(pyproject_file)
 
+            # Validate auditor is initialized (safer than assert which can be disabled with -O)
+            if self.auditor is None:
+                raise RuntimeError(
+                    "pip-audit auditor not initialized despite _available=True"
+                )
+
             # Run audit using Python API
-            assert self.auditor is not None  # Type guard: auditor exists when _available=True
             audit_results = self.auditor.audit(source)
 
             # Convert results to our format
