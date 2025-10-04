@@ -17,12 +17,15 @@ CLI Command: analyze_code_quality /path/to/project
 
 """
 
+import logging
 import re
 import subprocess
 from pathlib import Path
 
 from mfcqi.smell_detection.detector_base import SmellDetector
 from mfcqi.smell_detection.models import Smell, SmellCategory, SmellSeverity
+
+logger = logging.getLogger(__name__)
 
 
 class PyExamineDetector(SmellDetector):
@@ -97,8 +100,9 @@ class PyExamineDetector(SmellDetector):
             smells = self._parse_output(result.stdout, codebase)
             return smells
 
-        except (FileNotFoundError, subprocess.TimeoutExpired, Exception):
-            # Any error: return empty list (don't crash)
+        except (FileNotFoundError, subprocess.TimeoutExpired, Exception) as e:
+            # Log PyExamine execution failure (graceful degradation)
+            logger.debug(f"PyExamine smell detection failed for {codebase}: {e}")
             return []
 
     def _parse_output(self, output: str, codebase: Path) -> list[Smell]:

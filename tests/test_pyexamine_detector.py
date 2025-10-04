@@ -175,3 +175,30 @@ def test_maps_severity_correctly():
                 if smells:
                     # Should map to HIGH severity
                     assert any(s.severity == SmellSeverity.HIGH for s in smells)
+
+
+def test_pyexamine_logs_subprocess_exceptions():
+    """RED: Test that subprocess exceptions are logged (not silent)."""
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import patch
+
+    from mfcqi.smell_detection.pyexamine import PyExamineDetector
+
+    detector = PyExamineDetector()
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # Mock subprocess.run to raise Exception
+        with patch("subprocess.run", side_effect=ValueError("Mock parsing error")):
+            with patch.object(detector, "is_available", return_value=True):
+                with patch("mfcqi.smell_detection.pyexamine.logger") as mock_logger:
+                    # Should catch exception and return empty list
+                    result = detector.detect(Path(tmpdir))
+
+                    # Should return empty list on error
+                    assert result == []
+
+                    # Should log the exception
+                    assert mock_logger.debug.called, "Should log subprocess exception"
+                    log_message = mock_logger.debug.call_args[0][0]
+                    assert "pyexamine" in log_message.lower() or "failed" in log_message.lower()
