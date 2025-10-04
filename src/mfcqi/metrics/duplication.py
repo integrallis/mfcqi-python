@@ -2,8 +2,11 @@
 Code Duplication metric implementation.
 """
 
+import logging
 from pathlib import Path
 from typing import Any, Union, cast
+
+logger = logging.getLogger(__name__)
 
 from mfcqi.core.file_utils import get_python_files
 from mfcqi.core.metric import Metric
@@ -57,7 +60,9 @@ class CodeDuplication(Metric):
                         block_hash = hashlib.sha256(block.encode()).hexdigest()
                         file_blocks.append((file_idx, block_hash, len(block)))
 
-            except Exception:
+            except Exception as e:
+                # Log file processing failure (graceful degradation)
+                logger.debug(f"Failed to process {py_file} for duplication detection: {e}")
                 continue
 
         return file_blocks
@@ -145,7 +150,9 @@ class CodeDuplication(Metric):
 
             return self._calculate_intra_file_duplication_rate(duplicated_lines, len(lines))
 
-        except Exception:
+        except Exception as e:
+            # Log intra-file duplication check failure (graceful degradation)
+            logger.debug(f"Failed to check intra-file duplication for {file_path}: {e}")
             return 0.0
 
     def _normalize_lines_for_intra_file(self, lines: list[str]) -> list[str]:
