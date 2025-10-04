@@ -344,9 +344,9 @@ class SecurityMetric(Metric):
                                 skips_text = skips_match.group(1)
                                 # Find all quoted strings
                                 skips = re.findall(r'["\']([^"\']+)["\']', skips_text)
-                        except Exception:
-                            # If all parsing fails, just continue without config
-                            pass
+                        except Exception as e:
+                            # Log bandit config parsing failure (graceful degradation)
+                            logger.debug(f"Failed to parse bandit config at {bandit_config}: {e}")
 
                 # Create Bandit configuration and manager
                 b_conf = b_config.BanditConfig()

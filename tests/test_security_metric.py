@@ -466,3 +466,44 @@ def test_security_metric_configurable_thresholds():
         f"Scores should reflect thresholds: strict={score_strict:.3f}, "
         f"default={score_default:.3f}, lenient={score_lenient:.3f}"
     )
+
+
+def test_security_metric_logs_bandit_config_parsing_failure():
+    """RED: Test that Bandit config parsing failures are logged (not silent)."""
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import patch
+
+    from mfcqi.metrics.security import SecurityMetric
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        test_dir = Path(tmpdir)
+        test_file = test_dir / "code.py"
+        test_file.write_text("def foo(): pass")
+
+        # Create malformed Bandit config that will fail configparser
+        bandit_config = test_dir / ".bandit"
+        bandit_config.write_text("skips = ['test']")  # No section header = configparser error
+
+        metric = SecurityMetric()
+
+        # Mock Path.read_text to throw exception during manual parsing
+        original_read_text = Path.read_text
+
+        def mock_read_text(self, *args, **kwargs):
+            if self.name == ".bandit":
+                raise OSError("Mock permission denied")
+            return original_read_text(self, *args, **kwargs)
+
+        # Capture debug logs
+        with (
+            patch("mfcqi.metrics.security.logger") as mock_logger,
+            patch.object(Path, "read_text", mock_read_text),
+        ):
+            # This should trigger the exception handler at line 347
+            metric.extract(test_dir)
+
+            # Should log the parsing failure
+            assert mock_logger.debug.called, "Should log bandit config parsing failure"
+            log_message = mock_logger.debug.call_args[0][0]
+            assert "bandit config" in log_message.lower() or "failed" in log_message.lower()
