@@ -106,24 +106,29 @@ def test_timeout_configuration():
 
 
 def test_model_validation():
-    """RED: Test model validation for supported models."""
+    """Test model validation for supported models (no override)."""
     from mfcqi.analysis.config import AnalysisConfig
 
-    # Valid models should work
-    valid_models = ["claude-3-5-sonnet-20241022", "gpt-4o", "gpt-4o-mini"]
+    # Valid models should work and be retained
+    valid_models = [
+        "claude-3-5-sonnet-20241022",
+        "gpt-4o",
+        "gpt-4o-mini",
+        "gpt-5",
+        "gpt-5-mini",
+    ]
 
     for model in valid_models:
         config = AnalysisConfig(model=model)
         assert config.model == model
 
 
-def test_model_fallback():
-    """RED: Test model fallback for unsupported models."""
+def test_unknown_model_is_retained():
+    """Unknown models should be retained (no forced fallback)."""
     from mfcqi.analysis.config import AnalysisConfig
 
-    # Should fallback to default for unsupported models
     config = AnalysisConfig(model="unsupported-model")
-    assert config.model == "claude-3-5-sonnet-20241022"  # Default fallback
+    assert config.model == "unsupported-model"
 
 
 def test_get_api_key_for_model():
@@ -196,7 +201,7 @@ def test_config_from_dict():
 
 
 def test_default_models_list():
-    """RED: Test default models list."""
+    """Default supported models list includes new OpenAI versions."""
     from mfcqi.analysis.config import AnalysisConfig
 
     config = AnalysisConfig()
@@ -206,6 +211,8 @@ def test_default_models_list():
     assert "claude-3-5-sonnet-20241022" in models
     assert "gpt-4o" in models
     assert "gpt-4o-mini" in models
+    assert "gpt-5" in models
+    assert "gpt-5-mini" in models
 
 
 def test_model_priority():
@@ -223,13 +230,88 @@ def test_model_priority():
 
 
 def test_litellm_config():
-    """RED: Test LiteLLM configuration generation."""
+    """Test LiteLLM configuration generation."""
     from mfcqi.analysis.config import AnalysisConfig
 
     config = AnalysisConfig(model="gpt-4o", temperature=0.3)
     litellm_config = config.get_litellm_config()
-
     assert isinstance(litellm_config, dict)
     assert litellm_config["model"] == "gpt-4o"
     assert litellm_config["temperature"] == 0.3
     assert "messages" not in litellm_config  # Should not include messages
+
+
+def test_validate_config_unknown_gpt_with_openai_key():
+    """Unknown gpt* model with OpenAI key should validate (fall-through)."""
+    from mfcqi.analysis.config import AnalysisConfig
+
+    with patch.dict("os.environ", {"OPENAI_API_KEY": "sk-test-openai"}, clear=True):
+        config = AnalysisConfig(model="gpt-unknown-x")
+        # Should not raise
+        config.validate_config()
+
+
+def test_validate_config_unknown_gpt_without_key():
+    """Unknown gpt* model without OpenAI key should fail validation."""
+    from mfcqi.analysis.config import AnalysisConfig
+
+    config = AnalysisConfig(model="gpt-unknown-x")
+    with pytest.raises(ValueError):
+        config.validate_config()
+
+
+def test_litellm_config_includes_api_key_openai():
+    """get_litellm_config should include api_key when present (OpenAI)."""
+    from mfcqi.analysis.config import AnalysisConfig
+
+    config = AnalysisConfig(model="gpt-4o", openai_api_key="sk-explicit")
+    cfg = config.get_litellm_config()
+    assert cfg["api_key"] == "sk-explicit"
+
+
+def test_engine_passes_api_key_to_litellm_openai():
+    """Engine should pass api_key to litellm.completion for OpenAI models."""
+    from mfcqi.analysis.engine import LLMAnalysisEngine
+    from mfcqi.analysis.config import AnalysisConfig
+
+    calls: dict = {}
+
+    def fake_completion(*args, **kwargs):  # type: ignore[no-untyped-def]
+        calls["kwargs"] = kwargs
+
+        class DummyChoice:
+            def __init__(self, content: str) -> None:
+                self.message = type("M", (), {"content": content})
+
+        class DummyResp:
+            def __init__(self, content: str) -> None:
+                self.choices = [DummyChoice(content)]
+
+        return DummyResp("## [HIGH] Improve docs")
+
+    config = AnalysisConfig(model="gpt-4o", openai_api_key="sk-explicit")
+    engine = LLMAnalysisEngine(config=config)
+
+    with patch("mfcqi.analysis.engine.litellm.completion", side_effect=fake_completion):
+        _ = engine._make_llm_request("test prompt")
+
+    assert calls["kwargs"].get("api_key") == "sk-explicit"
+
+
+def test_unknown_model_falls_through_to_provider_error():
+    """Unknown model should reach provider and surface provider error."""
+    from mfcqi.analysis.engine import LLMAnalysisEngine
+    from mfcqi.analysis.config import AnalysisConfig
+
+    def fake_completion(*args, **kwargs):  # type: ignore[no-untyped-def]
+        raise Exception("Provider error: model not found")
+
+    config = AnalysisConfig(model="gpt-not-real", openai_api_key="sk-explicit")
+    engine = LLMAnalysisEngine(config=config)
+
+    with patch("mfcqi.analysis.engine.litellm.completion", side_effect=fake_completion):
+        with pytest.raises(Exception) as exc:
+            _ = engine._make_llm_request("prompt")
+
+    assert "LLM request failed: Provider error: model not found" in str(exc.value)
+
