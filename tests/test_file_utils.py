@@ -77,6 +77,39 @@ def test_get_python_files_exclude_tests():
         assert files_no_tests[0].name == "module.py"
 
 
+def test_get_python_files_single_file():
+    """Single .py file path should be returned as a list with that file."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        py = Path(tmpdir) / "single.py"
+        py.write_text("# module\n")
+
+        files = get_python_files(py)
+        assert files == [py]
+
+
+def test_get_python_files_single_file_excludes_tests():
+    """Single test file should be excluded when exclude_tests=True."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        test_py = Path(tmpdir) / "test_something.py"
+        test_py.write_text("# test module\n")
+
+        files = get_python_files(test_py, exclude_tests=True)
+        assert files == []
+
+        # Create tests directory
+        tests_dir = Path(tmpdir) / "tests"
+        tests_dir.mkdir()
+        (tests_dir / "test_something.py").write_text("# test")
+
+        # Without excluding tests
+        files_with_tests = get_python_files(Path(tmpdir), exclude_tests=False)
+        assert len(files_with_tests) == 2
+
+        # With excluding tests
+        files_no_tests = get_python_files(Path(tmpdir), exclude_tests=True)
+        assert files_no_tests == []
+
+
 def test_get_python_files_excludes_dot_directories():
     """Test that directories starting with . are excluded."""
     with tempfile.TemporaryDirectory() as tmpdir:

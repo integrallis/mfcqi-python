@@ -271,8 +271,8 @@ def test_litellm_config_includes_api_key_openai():
 
 def test_engine_passes_api_key_to_litellm_openai():
     """Engine should pass api_key to litellm.completion for OpenAI models."""
-    from mfcqi.analysis.engine import LLMAnalysisEngine
     from mfcqi.analysis.config import AnalysisConfig
+    from mfcqi.analysis.engine import LLMAnalysisEngine
 
     calls: dict = {}
 
@@ -300,8 +300,8 @@ def test_engine_passes_api_key_to_litellm_openai():
 
 def test_unknown_model_falls_through_to_provider_error():
     """Unknown model should reach provider and surface provider error."""
-    from mfcqi.analysis.engine import LLMAnalysisEngine
     from mfcqi.analysis.config import AnalysisConfig
+    from mfcqi.analysis.engine import LLMAnalysisEngine
 
     def fake_completion(*args, **kwargs):  # type: ignore[no-untyped-def]
         raise Exception("Provider error: model not found")
@@ -314,4 +314,3 @@ def test_unknown_model_falls_through_to_provider_error():
             _ = engine._make_llm_request("prompt")
 
     assert "LLM request failed: Provider error: model not found" in str(exc.value)
-

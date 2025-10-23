@@ -30,17 +30,32 @@ EXCLUDED_DIRS = {
 
 
 def get_python_files(codebase: Path, exclude_tests: bool = False) -> list[Path]:
-    """Get all Python files in codebase, excluding common non-project directories.
+    """Get Python files to analyze.
+
+    Accepts either a directory or a single .py file. When given a file, returns
+    a single-item list with that file if it passes exclusion rules.
 
     Args:
-        codebase: Root directory to search
+        codebase: Root directory or file to analyze
         exclude_tests: If True, also exclude test files
 
     Returns:
         List of Python file paths that should be analyzed
     """
-    py_files = []
+    py_files: list[Path] = []
 
+    # Single-file support
+    if codebase.is_file():
+        is_test = "test" in codebase.stem.lower() or "tests" in str(codebase.parent)
+        if (
+            codebase.suffix == ".py"
+            and should_analyze_file(codebase)
+            and not (exclude_tests and is_test)
+        ):
+            return [codebase]
+        return []
+
+    # Directory traversal
     for py_file in codebase.rglob("*.py"):
         # Check if any parent directory should be excluded
         should_exclude = False

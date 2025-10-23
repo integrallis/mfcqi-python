@@ -30,7 +30,6 @@ class AnalysisConfig(BaseModel):
         if "anthropic_api_key" not in kwargs:
             kwargs["anthropic_api_key"] = os.getenv("ANTHROPIC_API_KEY")
 
-
         super().__init__(**kwargs)
 
     def get_api_key_for_model(self, model: str) -> str | None:

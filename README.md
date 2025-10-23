@@ -48,6 +48,9 @@ mfcqi analyze .
 # Analyze specific directory
 mfcqi analyze src/mfcqi
 
+# Analyze a single file
+mfcqi analyze src/mfcqi/core/metric.py  
+
 # Analyze with AI recommendations (uses your API keys)
 mfcqi analyze . --model claude-3-5-sonnet-20241022
 
@@ -64,6 +67,7 @@ mfcqi analyze . --format json --output report.json
 mfcqi analyze . --min-score 0.75
 
 # Generate a badge for your project
+
 mfcqi badge .  # Shows shields.io URL
 
 # Generate badge JSON for GitHub endpoint

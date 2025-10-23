@@ -109,7 +109,7 @@ class MFCQICalculator:
         Returns:
             MFCQI score between 0.0 and 1.0
         """
-        if not codebase.exists() or not codebase.is_dir():
+        if not codebase.exists() or (not codebase.is_dir() and not codebase.is_file()):
             return 0.0
 
         # Check if codebase has any Python files (excluding .venv, etc.)
@@ -224,7 +224,7 @@ class MFCQICalculator:
         """
         results = {}
 
-        if not codebase.exists() or not codebase.is_dir():
+        if not codebase.exists() or (not codebase.is_dir() and not codebase.is_file()):
             # Return zeros for included metrics
             for metric_name in self.metrics:
                 results[metric_name] = 0.0
@@ -267,7 +267,7 @@ class MFCQICalculator:
         results = {}
         tool_outputs = {}
 
-        if not codebase.exists() or not codebase.is_dir():
+        if not codebase.exists() or (not codebase.is_dir() and not codebase.is_file()):
             return {"mfcqi_score": 0.0, "metrics": {}, "tool_outputs": {}}
 
         # Determine applicable metrics

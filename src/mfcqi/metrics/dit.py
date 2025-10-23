@@ -86,7 +86,7 @@ class DITMetric(Metric):
 
         Returns the maximum DIT value among all classes in the codebase.
         """
-        if not codebase.exists() or not codebase.is_dir():
+        if not codebase.exists():
             return 0.0
 
         max_dit = 0.0

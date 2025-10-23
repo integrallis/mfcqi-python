@@ -101,7 +101,7 @@ class Metric(ABC):
         Returns:
             Either a float (simple metrics) or dict (metrics with detailed breakdowns)
         """
-        pass
+        pass  # pragma: no cover
 
     @abstractmethod
     def normalize(self, value: Union[float, dict[str, Any]]) -> float:
@@ -116,7 +116,7 @@ class Metric(ABC):
         Returns:
             Normalized score between 0.0 and 1.0
         """
-        pass
+        pass  # pragma: no cover
 
     @abstractmethod
     def get_weight(self) -> float:
@@ -124,7 +124,7 @@ class Metric(ABC):
 
         This is a PRIMITIVE OPERATION in the template method pattern.
         """
-        pass
+        pass  # pragma: no cover
 
     @abstractmethod
     def get_name(self) -> str:
@@ -132,4 +132,4 @@ class Metric(ABC):
 
         This is a PRIMITIVE OPERATION in the template method pattern.
         """
-        pass
+        pass  # pragma: no cover
