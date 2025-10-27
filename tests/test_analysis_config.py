@@ -255,9 +255,10 @@ def test_validate_config_unknown_gpt_without_key():
     """Unknown gpt* model without OpenAI key should fail validation."""
     from mfcqi.analysis.config import AnalysisConfig
 
-    config = AnalysisConfig(model="gpt-unknown-x")
-    with pytest.raises(ValueError):
-        config.validate_config()
+    with patch.dict("os.environ", {}, clear=True):
+        config = AnalysisConfig(model="gpt-unknown-x")
+        with pytest.raises(ValueError):
+            config.validate_config()
 
 
 def test_litellm_config_includes_api_key_openai():
