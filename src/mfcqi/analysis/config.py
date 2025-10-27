@@ -30,12 +30,6 @@ class AnalysisConfig(BaseModel):
         if "anthropic_api_key" not in kwargs:
             kwargs["anthropic_api_key"] = os.getenv("ANTHROPIC_API_KEY")
 
-        # Validate model and fallback if needed
-        supported_models = ["claude-3-5-sonnet-20241022", "gpt-4o", "gpt-4o-mini"]
-
-        if kwargs["model"] not in supported_models:
-            kwargs["model"] = "claude-3-5-sonnet-20241022"
-
         super().__init__(**kwargs)
 
     def get_api_key_for_model(self, model: str) -> str | None:
@@ -68,7 +62,13 @@ class AnalysisConfig(BaseModel):
 
     def get_supported_models(self) -> list[str]:
         """Get list of supported models."""
-        return ["claude-3-5-sonnet-20241022", "gpt-4o", "gpt-4o-mini"]
+        return [
+            "claude-3-5-sonnet-20241022",
+            "gpt-4o",
+            "gpt-4o-mini",
+            "gpt-5",
+            "gpt-5-mini",
+        ]
 
     @classmethod
     def from_environment(cls) -> "AnalysisConfig":
@@ -88,10 +88,19 @@ class AnalysisConfig(BaseModel):
         return cls(model=model)
 
     def get_litellm_config(self) -> dict[str, Any]:
-        """Get configuration dictionary for LiteLLM."""
-        return {
+        """Get configuration dictionary for LiteLLM.
+
+        Includes provider API key if available, so callers don't need to rely on
+        environment variables being set in the current shell/session.
+        """
+        cfg: dict[str, Any] = {
             "model": self.model,
             "temperature": self.temperature,
             "max_tokens": self.max_tokens,
             "timeout": self.timeout,
         }
+        # Prefer explicit key from config; LiteLLM also supports passing `api_key`
+        api_key = self.get_api_key_for_model(self.model)
+        if api_key:
+            cfg["api_key"] = api_key
+        return cfg

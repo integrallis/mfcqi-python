@@ -718,3 +718,68 @@ def test_lcom_metric_detects_lack_of_cohesion():
         assert "lcom" in details
         # Low cohesion should result in lower score
         assert 0.0 <= details["lcom"] <= 1.0
+
+
+def test_single_file_detailed_metrics_have_doc_coverage():
+    """Analyzing a single .py file should return real metrics (not zeros fallback)."""
+    from mfcqi.calculator import MFCQICalculator
+
+    code = textwrap.dedent('''
+        """Module docstring."""
+        def f(x, y):
+            """Add x and y."""
+            return x + y
+    ''')
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        py = Path(tmpdir) / "one.py"
+        py.write_text(code)
+
+        calc = MFCQICalculator()
+        details = calc.get_detailed_metrics(py)
+
+        assert isinstance(details, dict)
+        assert "documentation_coverage" in details
+        # Normalized documentation coverage should be > 0 for documented module/function
+        assert details["documentation_coverage"] > 0.0
+        assert 0.0 <= details["mfcqi_score"] <= 1.0
+
+
+def test_single_file_calculate_bounds():
+    """calculate() on a single file should run and return a bounded score."""
+    from mfcqi.calculator import MFCQICalculator
+
+    code = "def f():\n    return 1\n"
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        py = Path(tmpdir) / "f.py"
+        py.write_text(code)
+
+        calc = MFCQICalculator()
+        score = calc.calculate(py)
+        assert 0.0 <= score <= 1.0
+
+
+def test_single_file_detailed_metrics_with_tool_outputs():
+    """get_detailed_metrics_with_tool_outputs() should accept a single file."""
+    from mfcqi.calculator import MFCQICalculator
+
+    code = textwrap.dedent("""
+        def g(a, b):
+            if a:
+                return b
+            return a
+    """)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        py = Path(tmpdir) / "g.py"
+        py.write_text(code)
+
+        calc = MFCQICalculator()
+        result = calc.get_detailed_metrics_with_tool_outputs(py)
+
+        assert isinstance(result, dict)
+        assert "metrics" in result and isinstance(result["metrics"], dict)
+        assert "mfcqi_score" in result
+        # Should include some standard metrics
+        assert "cyclomatic_complexity" in result["metrics"]
