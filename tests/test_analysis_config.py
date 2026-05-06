@@ -28,7 +28,7 @@ def test_analysis_config_default_model():
     from mfcqi.analysis.config import AnalysisConfig
 
     config = AnalysisConfig()
-    assert config.model == "claude-3-5-sonnet-20241022"
+    assert config.model == "claude-sonnet-4-5"
 
 
 def test_analysis_config_custom_model():
@@ -111,7 +111,7 @@ def test_model_validation():
 
     # Valid models should work and be retained
     valid_models = [
-        "claude-3-5-sonnet-20241022",
+        "claude-sonnet-4-5",
         "gpt-4o",
         "gpt-4o-mini",
         "gpt-5",
@@ -141,7 +141,7 @@ def test_get_api_key_for_model():
         config = AnalysisConfig()
 
         # Claude model should return Anthropic key
-        claude_key = config.get_api_key_for_model("claude-3-5-sonnet-20241022")
+        claude_key = config.get_api_key_for_model("claude-sonnet-4-5")
         assert claude_key == "anthropic-key"
 
         # GPT model should return OpenAI key
@@ -186,7 +186,7 @@ def test_config_from_dict():
     from mfcqi.analysis.config import AnalysisConfig
 
     config_dict = {
-        "model": "claude-3-5-sonnet-20241022",
+        "model": "claude-sonnet-4-5",
         "temperature": 0.2,
         "max_tokens": 2000,
         "timeout": 90,
@@ -194,7 +194,7 @@ def test_config_from_dict():
 
     config = AnalysisConfig.from_dict(config_dict)
 
-    assert config.model == "claude-3-5-sonnet-20241022"
+    assert config.model == "claude-sonnet-4-5"
     assert config.temperature == 0.2
     assert config.max_tokens == 2000
     assert config.timeout == 90
@@ -208,7 +208,7 @@ def test_default_models_list():
     models = config.get_supported_models()
 
     assert isinstance(models, list)
-    assert "claude-3-5-sonnet-20241022" in models
+    assert "claude-sonnet-4-5" in models
     assert "gpt-4o" in models
     assert "gpt-4o-mini" in models
     assert "gpt-5" in models
@@ -230,13 +230,19 @@ def test_model_priority():
 
 
 def test_litellm_config():
-    """Test LiteLLM configuration generation."""
+    """Test LiteLLM configuration generation.
+
+    The model name is normalized to carry the provider prefix LiteLLM now
+    requires (``openai/gpt-4o`` rather than the bare ``gpt-4o``); the
+    underlying ``config.model`` field still stores the bare name.
+    """
     from mfcqi.analysis.config import AnalysisConfig
 
     config = AnalysisConfig(model="gpt-4o", temperature=0.3)
     litellm_config = config.get_litellm_config()
     assert isinstance(litellm_config, dict)
-    assert litellm_config["model"] == "gpt-4o"
+    assert litellm_config["model"] == "openai/gpt-4o"
+    assert config.model == "gpt-4o"
     assert litellm_config["temperature"] == 0.3
     assert "messages" not in litellm_config  # Should not include messages
 

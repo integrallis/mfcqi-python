@@ -27,7 +27,7 @@ def test_llm_analysis_engine_default_model():
     from mfcqi.analysis.engine import LLMAnalysisEngine
 
     engine = LLMAnalysisEngine()
-    assert engine.model_name == "claude-3-5-sonnet-20241022"
+    assert engine.model_name == "claude-sonnet-4-5"
 
 
 def test_llm_analysis_engine_custom_model():
@@ -58,14 +58,14 @@ def test_analysis_result_creation():
         metric_scores={"complexity": 0.8},
         diagnostics=[collection],
         recommendations=["Improve test coverage"],
-        model_used="claude-3-5-sonnet-20241022",
+        model_used="claude-sonnet-4-5",
     )
 
     assert result.mfcqi_score == 0.75
     assert result.metric_scores["complexity"] == 0.8
     assert len(result.diagnostics) == 1
     assert len(result.recommendations) == 1
-    assert result.model_used == "claude-3-5-sonnet-20241022"
+    assert result.model_used == "claude-sonnet-4-5"
 
 
 # Note: Tests that require real API calls have been moved to tests/integration/test_llm_analysis.py
@@ -170,7 +170,7 @@ def test_analysis_result_json_serialization():
         metric_scores={"complexity": 0.8},
         diagnostics=[collection],
         recommendations=["Improve test coverage"],
-        model_used="claude-3-5-sonnet-20241022",
+        model_used="claude-sonnet-4-5",
     )
 
     json_str = result.model_dump_json()

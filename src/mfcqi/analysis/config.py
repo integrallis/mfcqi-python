@@ -7,11 +7,32 @@ from typing import Any
 
 from pydantic import BaseModel
 
+DEFAULT_MODEL = "claude-sonnet-4-5"
+
+
+def _resolve_litellm_model(model: str) -> str:
+    """Return the model name annotated with the explicit LiteLLM provider prefix.
+
+    LiteLLM no longer auto-detects the provider for a bare ``claude-*`` /
+    ``gpt-*`` name and raises ``BadRequestError`` instead. This helper ensures
+    every name handed to ``litellm.completion`` carries the right
+    ``anthropic/`` / ``openai/`` / ``ollama/`` namespace.
+    """
+    if "/" in model:
+        return model
+    if model.startswith("ollama:"):
+        return "ollama/" + model[len("ollama:") :]
+    if model.startswith("claude"):
+        return f"anthropic/{model}"
+    if model.startswith(("gpt", "o1", "o3", "o4")):
+        return f"openai/{model}"
+    return model
+
 
 class AnalysisConfig(BaseModel):
     """Configuration for LLM analysis."""
 
-    model: str = "claude-3-5-sonnet-20241022"
+    model: str = DEFAULT_MODEL
     temperature: float = 0.1
     max_tokens: int = 8000
     timeout: int = 60
@@ -22,7 +43,7 @@ class AnalysisConfig(BaseModel):
         """Initialize configuration with environment variables."""
         # Load from environment if not provided
         if "model" not in kwargs:
-            kwargs["model"] = os.getenv("CQI_LLM_MODEL", "claude-3-5-sonnet-20241022")
+            kwargs["model"] = os.getenv("CQI_LLM_MODEL", DEFAULT_MODEL)
 
         if "openai_api_key" not in kwargs:
             kwargs["openai_api_key"] = os.getenv("OPENAI_API_KEY")
@@ -33,10 +54,15 @@ class AnalysisConfig(BaseModel):
         super().__init__(**kwargs)
 
     def get_api_key_for_model(self, model: str) -> str | None:
-        """Get appropriate API key for the given model."""
-        if model.startswith("claude"):
+        """Get appropriate API key for the given model.
+
+        Accepts both bare names (``claude-sonnet-4-5``) and provider-prefixed
+        names (``anthropic/claude-sonnet-4-5``).
+        """
+        bare = model.split("/", 1)[1] if "/" in model else model
+        if bare.startswith("claude"):
             return self.anthropic_api_key
-        elif model.startswith("gpt"):
+        if bare.startswith(("gpt", "o1", "o3", "o4")):
             return self.openai_api_key
         return None
 
@@ -63,7 +89,9 @@ class AnalysisConfig(BaseModel):
     def get_supported_models(self) -> list[str]:
         """Get list of supported models."""
         return [
-            "claude-3-5-sonnet-20241022",
+            "claude-sonnet-4-5",
+            "claude-haiku-4-5",
+            "claude-opus-4-7",
             "gpt-4o",
             "gpt-4o-mini",
             "gpt-5",
@@ -77,29 +105,31 @@ class AnalysisConfig(BaseModel):
         anthropic_key = os.getenv("ANTHROPIC_API_KEY")
         openai_key = os.getenv("OPENAI_API_KEY")
 
-        # Priority: Claude > GPT-4o > GPT-4o-mini
+        # Priority: Claude > GPT-4o > default
         if anthropic_key:
-            model = "claude-3-5-sonnet-20241022"
+            model = DEFAULT_MODEL
         elif openai_key:
             model = "gpt-4o"
         else:
-            model = "claude-3-5-sonnet-20241022"  # Default
+            model = DEFAULT_MODEL
 
         return cls(model=model)
 
     def get_litellm_config(self) -> dict[str, Any]:
         """Get configuration dictionary for LiteLLM.
 
-        Includes provider API key if available, so callers don't need to rely on
-        environment variables being set in the current shell/session.
+        The ``model`` field is normalized through :func:`_resolve_litellm_model`
+        so it carries an explicit ``anthropic/``, ``openai/``, or ``ollama/``
+        prefix — LiteLLM rejects bare model names with ``BadRequestError``.
+        Includes the provider API key if available so callers do not need to
+        rely on environment variables being set in the current shell session.
         """
         cfg: dict[str, Any] = {
-            "model": self.model,
+            "model": _resolve_litellm_model(self.model),
             "temperature": self.temperature,
             "max_tokens": self.max_tokens,
             "timeout": self.timeout,
         }
-        # Prefer explicit key from config; LiteLLM also supports passing `api_key`
         api_key = self.get_api_key_for_model(self.model)
         if api_key:
             cfg["api_key"] = api_key

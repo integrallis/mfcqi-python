@@ -56,7 +56,8 @@ def test_analyze_with_existing_cqi_results():
 
     assert result.mfcqi_score == 0.45
     assert len(result.recommendations) > 0
-    assert result.model_used == "claude-3-5-sonnet-20241022"
+    # Whatever model the configuration resolved to is the one we should be told about.
+    assert result.model_used == engine.config.model
 
 
 @pytest.mark.skipif(not has_api_key(), reason="No LLM API key available")
