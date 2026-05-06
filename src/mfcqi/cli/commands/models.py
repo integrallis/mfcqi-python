@@ -1,22 +1,27 @@
-"""
-Model management commands with Rich animations and progress bars.s
+"""Model management commands for the Ollama HTTP API.
+
+Subcommands:
+
+* ``list`` — tabulate installed Ollama models.
+* ``pull`` — stream a model download via ``POST /api/pull`` and print
+  status / progress lines.
+* ``benchmark`` — measure cold-start and warm-response latency using
+  LiteLLM's ``ollama/<name>`` completion routing.
+* ``recommend`` — pattern-match installed models or print download
+  guidance.
+* ``test`` — run a single test completion against a named model.
 """
 
 import builtins
+import json
 import time
 
 import click
+import litellm
+import requests
 from rich.console import Console
 from rich.live import Live
 from rich.panel import Panel
-from rich.progress import (
-    BarColumn,
-    Progress,
-    SpinnerColumn,
-    TaskProgressColumn,
-    TextColumn,
-    TimeRemainingColumn,
-)
 from rich.spinner import Spinner
 from rich.table import Table
 
@@ -93,106 +98,157 @@ def list(endpoint: str) -> None:
 @models.command()
 @click.argument("model_name")
 @click.option("--endpoint", default="http://localhost:11434", help="Ollama endpoint")
-def pull(model_name: str, endpoint: str) -> None:
-    """Pull a model with animated progress bar."""
-    llm_handler = LLMHandler(ConfigManager(), endpoint)
+@click.pass_context
+def pull(ctx: click.Context, model_name: str, endpoint: str) -> None:
+    """Download an Ollama model.
 
-    # Check Ollama availability
-    with console.status("[cyan]🔍 Checking Ollama connection...", spinner="dots"):
-        status = llm_handler.check_ollama_connection()
+    Streams ``POST {endpoint}/api/pull`` and prints each status transition,
+    plus per-line ``MB / MB (P%)`` progress when ``completed`` / ``total``
+    fields are present. Stream-level errors are reported on stderr and the
+    process exits with code 2.
 
-    if not status["available"]:
-        console.print("❌ Ollama not available", style="red")
-        return
+    Direct ``requests`` is used here rather than LiteLLM because model
+    download is an Ollama management endpoint, not a completion call.
+    """
+    try:
+        response = requests.post(
+            f"{endpoint}/api/pull",
+            json={"name": model_name, "stream": True},
+            stream=True,
+            timeout=(10, 3600),  # 10s connect, 1h read for large models
+        )
+    except requests.RequestException as exc:
+        click.echo(f"Failed to reach Ollama at {endpoint}: {exc}", err=True)
+        ctx.exit(2)
 
-    # Simulate model download with progress bar
-    console.print(f"🔽 Downloading {model_name}...")
+    if not response.ok:
+        click.echo(f"Ollama returned HTTP {response.status_code} for /api/pull", err=True)
+        ctx.exit(2)
 
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        BarColumn(),
-        TaskProgressColumn(),
-        TimeRemainingColumn(),
-        console=console,
-    ) as progress:
-        # Add download task
-        download_task = progress.add_task(f"Downloading {model_name}", total=100)
+    exit_code = _stream_pull_status(response.iter_lines(decode_unicode=True))
+    if exit_code != 0:
+        ctx.exit(exit_code)
 
-        # Simulate download progress
-        for _ in range(100):
-            time.sleep(0.05)  # Simulate download time
-            progress.update(download_task, advance=1)
 
-    console.print(f"✅ {model_name} ready for use", style="green")
+def _stream_pull_status(lines) -> int:
+    """Consume the JSONL stream from /api/pull, returning the exit code."""
+    last_status = None
+    for raw in lines:
+        if not raw:
+            continue
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError:
+            click.echo(f"Failed to parse pull response line: {raw!r}", err=True)
+            return 2
+
+        if "error" in payload:
+            click.echo(f"Ollama error: {payload['error']}", err=True)
+            return 2
+
+        status = payload.get("status", "")
+        if status != last_status:
+            click.echo(status)
+            last_status = status
+        elif "completed" in payload and "total" in payload:
+            completed = int(payload["completed"])
+            total = int(payload["total"])
+            if total > 0:
+                pct = (100.0 * completed) / total
+                click.echo(
+                    f"  {status} — {completed // (1024 * 1024)} / {total // (1024 * 1024)} MB ({pct:.1f}%)"
+                )
+    return 0
 
 
 @models.command()
 @click.argument("model_name", required=False)
 @click.option("--endpoint", default="http://localhost:11434", help="Ollama endpoint")
-def benchmark(model_name: str, endpoint: str) -> None:
-    """Benchmark model performance with animated testing."""
-    llm_handler = LLMHandler(ConfigManager(), endpoint)
+@click.option(
+    "--prompt",
+    default="Write one short sentence about Python.",
+    help="Benchmark prompt sent to the model.",
+)
+@click.option(
+    "--warm-runs",
+    default=3,
+    type=int,
+    help="Number of warm runs to average after the cold-start measurement.",
+)
+@click.pass_context
+def benchmark(
+    ctx: click.Context, model_name: str, endpoint: str, prompt: str, warm_runs: int
+) -> None:
+    """Benchmark model latency.
 
-    # Check connection
-    with console.status("[cyan]🔍 Checking Ollama connection...", spinner="dots"):
-        status = llm_handler.check_ollama_connection()
+    Issues one cold-start completion followed by ``--warm-runs`` warm
+    completions through LiteLLM's ``ollama/<name>`` routing and prints the
+    measured wall-clock latency for each phase.
+    """
+    llm_handler = LLMHandler(ConfigManager(), endpoint)
+    status = llm_handler.check_ollama_connection()
 
     if not status["available"]:
         console.print("❌ Ollama not available", style="red")
+        ctx.exit(2)
+
+    targets = [model_name] if model_name else status["models"]
+    if not targets:
+        console.print(
+            "📋 No models installed. Install one with: ollama pull codellama:7b", style="yellow"
+        )
         return
 
-    models_to_test = [model_name] if model_name else status["models"]
+    for target in targets:
+        console.print(f"\n🧪 [bold cyan]Benchmarking {target}[/bold cyan]")
+        try:
+            cold = _measure_completion_latency(endpoint, target, prompt)
+        except Exception as exc:  # LiteLLM raises various provider-specific exceptions.
+            console.print(f"  ❌ Cold-start request failed: {exc}", style="red")
+            continue
 
-    for model in models_to_test:
-        console.print(f"\n🧪 [bold cyan]Testing {model}...[/bold cyan]")
+        warm_latencies: builtins.list[float] = []
+        for _ in range(max(0, warm_runs)):
+            try:
+                warm_latencies.append(_measure_completion_latency(endpoint, target, prompt))
+            except Exception as exc:
+                console.print(f"  ⚠️  Warm request failed: {exc}", style="yellow")
 
-        # Animated testing sequence
-        with Progress(
-            SpinnerColumn(), TextColumn("[progress.description]{task.description}"), console=console
-        ) as progress:
-            # Cold start test
-            cold_start_task = progress.add_task("❄️  Cold start test", total=None)
-            time.sleep(1.5)  # Simulate cold start
-            progress.update(cold_start_task, description="❄️  Cold start: 2.1s")
-            progress.remove_task(cold_start_task)
-
-            # Warm response test
-            warm_task = progress.add_task("🔥 Warm response test", total=None)
-            time.sleep(0.8)  # Simulate warm response
-            progress.update(warm_task, description="🔥 Warm response: 0.8s")
-            progress.remove_task(warm_task)
-
-            # Quality test
-            quality_task = progress.add_task("📊 Quality assessment", total=None)
-            time.sleep(1.2)  # Simulate quality test
-            progress.update(quality_task, description="📊 Quality: ✅ Excellent")
-            progress.remove_task(quality_task)
-
-        # Results table
-        results_table = Table(title=f"Benchmark Results: {model}", show_header=True)
-        results_table.add_column("Metric", style="cyan")
-        results_table.add_column("Score", style="bright_white")
-        results_table.add_column("Rating", style="yellow")
-
-        # Determine performance based on model type
-        if "codellama" in model.lower() or "code" in model.lower():
-            results_table.add_row("⚡ Speed", "★★★★☆", "Fast (8.2s avg)")
-            results_table.add_row("📊 Code Quality", "★★★★★", "Excellent")
-            results_table.add_row("💾 Memory", "★★★★☆", "Moderate (3.8GB)")
-            results_table.add_row("🎯 MFCQI Score", "⭐ RECOMMENDED", "Best for code analysis")
-        elif "mixtral" in model.lower():
-            results_table.add_row("⚡ Speed", "★★☆☆☆", "Slow (15.4s avg)")
-            results_table.add_row("📊 Code Quality", "★★★★★", "Excellent")
-            results_table.add_row("💾 Memory", "★★☆☆☆", "High (26GB)")
-            results_table.add_row("🎯 MFCQI Score", "✅ HIGH QUALITY", "Best quality, slower")
-        else:
-            results_table.add_row("⚡ Speed", "★★★★☆", "Good (9.1s avg)")
-            results_table.add_row("📊 Code Quality", "★★★★☆", "Good")
-            results_table.add_row("💾 Memory", "★★★★☆", "Moderate")
-            results_table.add_row("🎯 MFCQI Score", "✅ GOOD", "Solid general purpose")
-
+        results_table = Table(title=f"Benchmark Results: {target}", show_header=True)
+        results_table.add_column("Phase", style="cyan")
+        results_table.add_column("Latency", style="bright_white")
+        results_table.add_row("❄️  Cold start", f"{cold:.2f}s")
+        if warm_latencies:
+            avg = sum(warm_latencies) / len(warm_latencies)
+            best = min(warm_latencies)
+            worst = max(warm_latencies)
+            results_table.add_row(
+                f"🔥 Warm x {len(warm_latencies)}",
+                f"avg {avg:.2f}s   min {best:.2f}s   max {worst:.2f}s",
+            )
         console.print(results_table)
+
+
+def _measure_completion_latency(endpoint: str, model: str, prompt: str) -> float:
+    """Issue a single completion through LiteLLM and return its wall-clock latency.
+
+    Routes via the ``ollama/<model>`` namespace so the same code path serves
+    every Ollama model the user has pulled. The Ollama HTTP endpoint is
+    passed through the LiteLLM ``api_base`` parameter.
+    """
+    # LiteLLM accepts either "ollama/" or already-prefixed names; normalize to the prefix form.
+    routed = model if model.startswith(("ollama/", "ollama:")) else f"ollama/{model}"
+    routed = routed.replace("ollama:", "ollama/")
+    started = time.monotonic()
+    response = litellm.completion(
+        model=routed,
+        messages=[{"role": "user", "content": prompt}],
+        api_base=endpoint,
+        stream=False,
+    )
+    # Touch the response payload so the elapsed time reflects model output, not just dispatch.
+    _ = response.choices[0].message.content
+    return time.monotonic() - started
 
 
 @models.command()
