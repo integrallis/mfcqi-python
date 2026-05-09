@@ -15,6 +15,7 @@ Subcommands:
 import builtins
 import json
 import time
+from collections.abc import Iterable
 
 import click
 import litellm
@@ -130,7 +131,7 @@ def pull(ctx: click.Context, model_name: str, endpoint: str) -> None:
         ctx.exit(exit_code)
 
 
-def _stream_pull_status(lines) -> int:
+def _stream_pull_status(lines: Iterable[str]) -> int:
     """Consume the JSONL stream from /api/pull, returning the exit code."""
     last_status = None
     for raw in lines:

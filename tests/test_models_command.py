@@ -36,7 +36,9 @@ def test_stream_pull_status_prints_each_unique_status(capsys) -> None:
     lines = [
         json.dumps({"status": "pulling manifest"}),
         json.dumps({"status": "downloading", "completed": 1024 * 1024, "total": 1024 * 1024 * 4}),
-        json.dumps({"status": "downloading", "completed": 1024 * 1024 * 2, "total": 1024 * 1024 * 4}),
+        json.dumps(
+            {"status": "downloading", "completed": 1024 * 1024 * 2, "total": 1024 * 1024 * 4}
+        ),
         json.dumps({"status": "verifying sha256 digest"}),
         json.dumps({"status": "success"}),
     ]
@@ -79,7 +81,9 @@ def test_models_pull_command_exits_two_when_ollama_unreachable() -> None:
     ):
         result = runner.invoke(models, ["pull", "codellama:7b"])
     assert result.exit_code == 2
-    assert "Failed to reach Ollama" in result.output or "Failed to reach Ollama" in (result.stderr_bytes or b"").decode("utf-8", "ignore")
+    assert "Failed to reach Ollama" in result.output or "Failed to reach Ollama" in (
+        result.stderr_bytes or b""
+    ).decode("utf-8", "ignore")
 
 
 def test_models_pull_command_streams_status_to_stdout() -> None:
@@ -131,11 +135,12 @@ def _stub_litellm_response(content: str = "ok") -> MagicMock:
 def test_measure_completion_latency_routes_through_litellm() -> None:
     """Latency comes from time.monotonic deltas around a litellm.completion call."""
     times = iter([100.0, 100.42])  # +0.42s wall-clock
-    with patch(
-        "mfcqi.cli.commands.models.litellm.completion",
-        return_value=_stub_litellm_response(),
-    ) as completion, patch(
-        "mfcqi.cli.commands.models.time.monotonic", side_effect=lambda: next(times)
+    with (
+        patch(
+            "mfcqi.cli.commands.models.litellm.completion",
+            return_value=_stub_litellm_response(),
+        ) as completion,
+        patch("mfcqi.cli.commands.models.time.monotonic", side_effect=lambda: next(times)),
     ):
         latency = _measure_completion_latency("http://localhost:11434", "codellama:7b", "hi")
 
@@ -151,11 +156,12 @@ def test_measure_completion_latency_routes_through_litellm() -> None:
 def test_measure_completion_latency_normalizes_existing_prefix() -> None:
     """A model already namespaced as ``ollama:`` is rewritten to ``ollama/``."""
     times = iter([0.0, 0.1])
-    with patch(
-        "mfcqi.cli.commands.models.litellm.completion",
-        return_value=_stub_litellm_response(),
-    ) as completion, patch(
-        "mfcqi.cli.commands.models.time.monotonic", side_effect=lambda: next(times)
+    with (
+        patch(
+            "mfcqi.cli.commands.models.litellm.completion",
+            return_value=_stub_litellm_response(),
+        ) as completion,
+        patch("mfcqi.cli.commands.models.time.monotonic", side_effect=lambda: next(times)),
     ):
         _measure_completion_latency("http://x", "ollama:llama3:8b", "hi")
     assert completion.call_args.kwargs["model"] == "ollama/llama3:8b"
@@ -169,19 +175,25 @@ def test_models_benchmark_command_runs_completions_for_named_model() -> None:
     # 1 cold + 3 warm = 4 measurement pairs of monotonic() calls.
     times = iter(
         [
-            0.0, 0.5,   # cold
-            1.0, 1.2,   # warm 1
-            2.0, 2.1,   # warm 2
-            3.0, 3.05,  # warm 3
+            0.0,
+            0.5,  # cold
+            1.0,
+            1.2,  # warm 1
+            2.0,
+            2.1,  # warm 2
+            3.0,
+            3.05,  # warm 3
         ]
     )
 
     runner = CliRunner()
-    with patch("mfcqi.cli.commands.models.LLMHandler", return_value=handler), patch(
-        "mfcqi.cli.commands.models.litellm.completion",
-        return_value=_stub_litellm_response(),
-    ) as completion, patch(
-        "mfcqi.cli.commands.models.time.monotonic", side_effect=lambda: next(times)
+    with (
+        patch("mfcqi.cli.commands.models.LLMHandler", return_value=handler),
+        patch(
+            "mfcqi.cli.commands.models.litellm.completion",
+            return_value=_stub_litellm_response(),
+        ) as completion,
+        patch("mfcqi.cli.commands.models.time.monotonic", side_effect=lambda: next(times)),
     ):
         result = runner.invoke(models, ["benchmark", "codellama:7b"])
 
