@@ -48,6 +48,7 @@ jobs:
         brew install bc  # For numeric comparisons in scripts
 
     - name: Run all quality checks with coverage
+      shell: bash
       env:
         MFCQI_DISABLE_KEYRING: "1"
       run: |
