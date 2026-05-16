@@ -14,8 +14,18 @@ NOTE: pip-audit is an optional dependency. If not installed, this analyzer
 will gracefully degrade and return empty vulnerability lists.
 """
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+
+@dataclass
+class PipAuditScanResult:
+    """Structured result for a pip-audit dependency scan."""
+
+    vulnerabilities: list[dict[str, Any]]
+    success: bool = True
+    error: str = ""
 
 
 class PipAuditAnalyzer:
@@ -68,9 +78,15 @@ class PipAuditAnalyzer:
             List of vulnerability dictionaries with package info.
             Returns empty list if pip-audit not available.
         """
+        return self.scan_requirements_with_status(requirements_file).vulnerabilities
+
+    def scan_requirements_with_status(self, requirements_file: Path) -> PipAuditScanResult:
+        """Scan a requirements file and report scanner status separately."""
         # Check if pip-audit is available
         if not self._available:
-            return []
+            return PipAuditScanResult(
+                vulnerabilities=[], success=False, error="pip-audit is not available"
+            )
 
         try:
             # Lazy import here too for the RequirementSource
@@ -109,11 +125,10 @@ class PipAuditAnalyzer:
                         }
                     )
 
-            return vulnerabilities
+            return PipAuditScanResult(vulnerabilities=vulnerabilities)
 
-        except Exception:
-            # Return empty list on error (graceful degradation)
-            return []
+        except Exception as exc:
+            return PipAuditScanResult(vulnerabilities=[], success=False, error=str(exc))
 
     def scan_pyproject(self, pyproject_file: Path) -> list[dict[str, Any]]:
         """
@@ -128,9 +143,15 @@ class PipAuditAnalyzer:
             List of vulnerability dictionaries with package info.
             Returns empty list if pip-audit not available.
         """
+        return self.scan_pyproject_with_status(pyproject_file).vulnerabilities
+
+    def scan_pyproject_with_status(self, pyproject_file: Path) -> PipAuditScanResult:
+        """Scan a pyproject.toml file and report scanner status separately."""
         # Check if pip-audit is available
         if not self._available:
-            return []
+            return PipAuditScanResult(
+                vulnerabilities=[], success=False, error="pip-audit is not available"
+            )
 
         try:
             # Lazy import here too for the PyProjectSource
@@ -169,11 +190,10 @@ class PipAuditAnalyzer:
                         }
                     )
 
-            return vulnerabilities
+            return PipAuditScanResult(vulnerabilities=vulnerabilities)
 
-        except Exception:
-            # Return empty list on error (graceful degradation)
-            return []
+        except Exception as exc:
+            return PipAuditScanResult(vulnerabilities=[], success=False, error=str(exc))
 
     def scan_dependency_file(self, dep_file: Path) -> list[dict[str, Any]]:
         """
@@ -202,3 +222,18 @@ class PipAuditAnalyzer:
             # setup.py, setup.cfg, Pipfile not yet supported
             # Would require additional dependency source implementations
             return []
+
+    def scan_dependency_file_with_status(self, dep_file: Path) -> PipAuditScanResult:
+        """Scan any supported dependency file and report scanner status separately."""
+        filename = dep_file.name
+
+        if filename == "pyproject.toml":
+            return self.scan_pyproject_with_status(dep_file)
+        elif filename.startswith("requirements") and filename.endswith(".txt"):
+            return self.scan_requirements_with_status(dep_file)
+        else:
+            return PipAuditScanResult(
+                vulnerabilities=[],
+                success=False,
+                error=f"Unsupported dependency file format: {filename}",
+            )

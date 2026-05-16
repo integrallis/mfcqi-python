@@ -107,6 +107,24 @@ def test_multiple_vulnerabilities_weighted():
     assert metric.normalize(20.0) < 0.05  # Critical vulns
 
 
+def test_scan_failures_are_recorded_separately():
+    """Test dependency scanner failures are distinguishable from vulnerabilities."""
+    from mfcqi.metrics.dependency_security import DependencySecurityMetric
+
+    metric = DependencySecurityMetric()
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        setup_file = Path(tmpdir) / "setup.py"
+        setup_file.write_text("from setuptools import setup\nsetup(name='example')\n")
+
+        raw_score = metric.extract(Path(tmpdir))
+
+        assert raw_score == 0.0
+        assert metric.last_scan_errors
+        assert metric.last_scan_errors[0]["file"] == str(setup_file)
+        assert "Unsupported dependency file format" in metric.last_scan_errors[0]["error"]
+
+
 def test_metric_weight():
     """Test that weight is 0.75 based on research."""
     from mfcqi.metrics.dependency_security import DependencySecurityMetric
