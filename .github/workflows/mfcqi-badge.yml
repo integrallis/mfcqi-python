@@ -16,6 +16,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write  # Required for git push to update badge file
+      issues: write    # Required for PR comments
+      pull-requests: write
 
     steps:
     - uses: actions/checkout@v3
@@ -101,9 +103,13 @@ jobs:
           const emoji = status === 'passing' ? '✅' : '⚠️';
           const trendEmoji = arrow === '↑' ? '📈' : arrow === '↓' ? '📉' : '➡️';
 
-          github.rest.issues.createComment({
-            issue_number: context.issue.number,
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            body: `## ${emoji} MFCQI Score: ${score} ${arrow} ${deltaFormatted}\n\n${trendEmoji} **Previous:** ${oldScore}\n\nCode quality ${status === 'passing' ? 'meets' : 'does not meet'} the minimum threshold (0.70).`
-          })
+          try {
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## ${emoji} MFCQI Score: ${score} ${arrow} ${deltaFormatted}\n\n${trendEmoji} **Previous:** ${oldScore}\n\nCode quality ${status === 'passing' ? 'meets' : 'does not meet'} the minimum threshold (0.70).`
+            });
+          } catch (error) {
+            core.warning(`Unable to post MFCQI PR comment: ${error.message}`);
+          }
