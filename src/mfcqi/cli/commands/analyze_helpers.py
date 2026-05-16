@@ -1,6 +1,7 @@
 """Helper functions for the analyze command."""
 
 import json
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -20,7 +21,7 @@ console = Console()
 
 
 def calculate_metrics(
-    path: Path,
+    path: Path | Sequence[Path],
     calculator: MFCQICalculator,
     need_tool_outputs: bool,
     silent: bool,
@@ -42,18 +43,24 @@ def calculate_metrics(
         task = progress.add_task("🔍 Analyzing codebase...", total=None)
         start_time = time.time()
 
-        if need_tool_outputs:
+        paths = [path] if isinstance(path, Path) else list(path)
+
+        if len(paths) > 1:
+            detailed_metrics, tool_outputs = _calculate_metrics_for_multiple_paths(
+                paths, calculator, need_tool_outputs
+            )
+        elif need_tool_outputs:
             progress.update(
                 task,
                 description="📊 Calculating metrics...",
             )
-            detailed_data = calculator.get_detailed_metrics_with_tool_outputs(path)
+            detailed_data = calculator.get_detailed_metrics_with_tool_outputs(paths[0])
             detailed_metrics = detailed_data.get("metrics", {})
             detailed_metrics["mfcqi_score"] = detailed_data.get("mfcqi_score", 0.0)
             tool_outputs = detailed_data.get("tool_outputs", {})
         else:
             progress.update(task, description="📊 Calculating metrics...")
-            detailed_metrics = calculator.get_detailed_metrics(path)
+            detailed_metrics = calculator.get_detailed_metrics(paths[0])
             tool_outputs = {}
 
         elapsed = time.time() - start_time
@@ -66,6 +73,56 @@ def calculate_metrics(
             )
 
     return detailed_metrics, tool_outputs, elapsed
+
+
+def _calculate_metrics_for_multiple_paths(
+    paths: Sequence[Path],
+    calculator: MFCQICalculator,
+    need_tool_outputs: bool,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Calculate metrics for multiple paths and average shared numeric results."""
+    metric_sets: list[dict[str, Any]] = []
+    merged_tool_outputs: dict[str, Any] = {}
+
+    for current_path in paths:
+        if need_tool_outputs:
+            detailed_data = calculator.get_detailed_metrics_with_tool_outputs(current_path)
+            metrics = detailed_data.get("metrics", {})
+            metrics["mfcqi_score"] = detailed_data.get("mfcqi_score", 0.0)
+            _merge_tool_outputs(merged_tool_outputs, detailed_data.get("tool_outputs", {}))
+        else:
+            metrics = calculator.get_detailed_metrics(current_path)
+        metric_sets.append(metrics)
+
+    return _average_metric_sets(metric_sets), merged_tool_outputs
+
+
+def _average_metric_sets(metric_sets: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    """Average numeric metric values across multiple analysis results."""
+    averaged: dict[str, Any] = {}
+    metric_names = {name for metrics in metric_sets for name in metrics}
+
+    for metric_name in metric_names:
+        values = [
+            metrics[metric_name]
+            for metrics in metric_sets
+            if isinstance(metrics.get(metric_name), (int, float))
+        ]
+        if values:
+            averaged[metric_name] = sum(values) / len(values)
+
+    return averaged
+
+
+def _merge_tool_outputs(target: dict[str, Any], source: dict[str, Any]) -> None:
+    """Merge tool outputs collected from separate path analyses."""
+    for key, value in source.items():
+        if isinstance(value, list):
+            target.setdefault(key, []).extend(value)
+        elif isinstance(value, (int, float)):
+            target[key] = max(target.get(key, value), value)
+        else:
+            target[key] = value
 
 
 def get_llm_recommendations(
