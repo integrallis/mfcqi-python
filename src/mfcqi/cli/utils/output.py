@@ -37,6 +37,7 @@ def format_json_output(analysis_result: dict[str, Any]) -> dict[str, Any]:
         "metrics": analysis_result.get("metric_scores", {}),
         "recommendations": analysis_result.get("recommendations", []),
         "model_used": analysis_result.get("model_used", "metrics-only"),
+        "metric_statuses": analysis_result.get("metric_statuses", {}),
         "diagnostics_count": len(analysis_result.get("diagnostics", [])),
         "timestamp": analysis_result.get("timestamp"),
         "version": __version__,

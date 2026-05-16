@@ -99,6 +99,7 @@ class MFCQICalculator:
         # Cache for metrics to avoid recreating them
         self._cached_metrics: dict[str, Any] | None = None
         self._cached_codebase: Path | None = None
+        self.last_metric_statuses: dict[str, dict[str, Any]] = {}
 
     def calculate(self, codebase: Path) -> float:
         """Calculate MFCQI score using geometric mean formula.
@@ -110,11 +111,13 @@ class MFCQICalculator:
             MFCQI score between 0.0 and 1.0
         """
         if not codebase.exists() or (not codebase.is_dir() and not codebase.is_file()):
+            self.last_metric_statuses = {}
             return 0.0
 
         # Check if codebase has any Python files (excluding .venv, etc.)
         py_files = get_python_files(codebase)
         if not py_files:
+            self.last_metric_statuses = {}
             return 0.0
 
         # Determine final metrics based on complexity analysis
@@ -122,8 +125,9 @@ class MFCQICalculator:
 
         # Extract and normalize all metrics
         normalized_scores = []
+        self.last_metric_statuses = {}
 
-        for _metric_name, metric in final_metrics.items():
+        for metric_name, metric in final_metrics.items():
             try:
                 # Extract raw metric value
                 raw_value = metric.extract(codebase)
@@ -135,10 +139,12 @@ class MFCQICalculator:
                 normalized_value = max(0.0, min(1.0, normalized_value))
 
                 normalized_scores.append(normalized_value)
+                self._record_metric_status(metric_name, "ok", raw_value, normalized_value)
 
-            except Exception:
+            except Exception as e:
                 # If metric fails, use 0.0 (worst score)
                 normalized_scores.append(0.0)
+                self._record_metric_status(metric_name, "failed", None, 0.0, str(e))
 
         # Calculate geometric mean
         return self._calculate_geometric_mean(normalized_scores)
@@ -223,6 +229,7 @@ class MFCQICalculator:
             Dictionary with metric names and their normalized scores
         """
         results = {}
+        self.last_metric_statuses = {}
 
         if not codebase.exists() or (not codebase.is_dir() and not codebase.is_file()):
             # Return zeros for included metrics
@@ -241,16 +248,39 @@ class MFCQICalculator:
                 normalized_value = metric.normalize(raw_value)
                 normalized_value = max(0.0, min(1.0, normalized_value))
                 results[metric_name] = normalized_value
+                self._record_metric_status(metric_name, "ok", raw_value, normalized_value)
             except Exception as e:
                 import logging
 
                 logging.warning(f"Failed to calculate metric {metric_name}: {e}")
                 results[metric_name] = 0.0
+                self._record_metric_status(metric_name, "failed", None, 0.0, str(e))
 
         # Calculate overall MFCQI score
-        results["mfcqi_score"] = self.calculate(codebase)
+        results["mfcqi_score"] = self._calculate_geometric_mean(
+            [score for score in results.values() if isinstance(score, (int, float))]
+        )
 
         return results
+
+    def _record_metric_status(
+        self,
+        metric_name: str,
+        status: str,
+        raw_value: Any,
+        normalized_value: float,
+        error: str | None = None,
+    ) -> None:
+        """Record structured status for the most recent metric calculation."""
+        metric_status: dict[str, Any] = {
+            "status": status,
+            "normalized_value": normalized_value,
+        }
+        if raw_value is not None:
+            metric_status["raw_value"] = raw_value
+        if error:
+            metric_status["error"] = error
+        self.last_metric_statuses[metric_name] = metric_status
 
     def get_detailed_metrics_with_tool_outputs(self, codebase: Path) -> dict[str, Any]:
         """Get detailed metrics WITH raw tool outputs for LLM context.
@@ -274,11 +304,13 @@ class MFCQICalculator:
         applicable_metrics = self._determine_applicable_metrics(codebase)
 
         # Calculate each metric AND collect tool outputs
+        self.last_metric_statuses = {}
         for metric_name, metric in applicable_metrics.items():
             try:
                 raw_value = metric.extract(codebase)
                 normalized_value = metric.normalize(raw_value)
                 results[metric_name] = max(0.0, min(1.0, normalized_value))
+                self._record_metric_status(metric_name, "ok", raw_value, results[metric_name])
 
                 # Get the actual Bandit issues if available for security metric
                 if (
@@ -304,11 +336,19 @@ class MFCQICalculator:
                 # Log metric extraction failure (graceful degradation to 0.0)
                 logger.debug(f"Metric '{metric_name}' extraction failed: {e}. Using 0.0")
                 results[metric_name] = 0.0
+                self._record_metric_status(metric_name, "failed", None, 0.0, str(e))
 
         # Calculate overall score
-        mfcqi_score = self.calculate(codebase)
+        mfcqi_score = self._calculate_geometric_mean(
+            [score for score in results.values() if isinstance(score, (int, float))]
+        )
 
-        return {"mfcqi_score": mfcqi_score, "metrics": results, "tool_outputs": tool_outputs}
+        return {
+            "mfcqi_score": mfcqi_score,
+            "metrics": results,
+            "tool_outputs": tool_outputs,
+            "metric_statuses": self.last_metric_statuses,
+        }
 
     def _get_complex_functions(self, codebase: Path, limit: int = 10) -> list[dict[str, Any]]:
         """Get the most complex functions in the codebase.

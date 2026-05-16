@@ -17,6 +17,10 @@ def test_format_json_output():
         "recommendations": ["Improve documentation", "Reduce complexity"],
         "model_used": "claude-3-5-sonnet",
         "diagnostics": [{"severity": "warning", "message": "Test warning"}],
+        "metric_statuses": {
+            "cyclomatic_complexity": {"status": "ok", "raw_value": 1.0},
+            "maintainability_index": {"status": "failed", "error": "tool failed"},
+        },
         "timestamp": "2025-01-01T00:00:00",
     }
 
@@ -27,6 +31,7 @@ def test_format_json_output():
     assert result["recommendations"] == analysis_result["recommendations"]
     assert result["model_used"] == "claude-3-5-sonnet"
     assert result["diagnostics_count"] == 1
+    assert result["metric_statuses"] == analysis_result["metric_statuses"]
     assert result["timestamp"] == "2025-01-01T00:00:00"
     assert "version" in result
 

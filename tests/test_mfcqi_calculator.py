@@ -438,6 +438,8 @@ def test_metric_exception_handling():
             # Should still return a score (0.0 for failed metric)
             result = calculator.calculate(Path(tmpdir))
             assert 0.0 <= result <= 1.0
+            assert calculator.last_metric_statuses["cyclomatic_complexity"]["status"] == "failed"
+            assert "Test error" in calculator.last_metric_statuses["cyclomatic_complexity"]["error"]
 
 
 def test_get_detailed_metrics_invalid_codebase():
@@ -499,6 +501,8 @@ def test_detailed_metrics_exception_handling():
             assert isinstance(result, dict)
             assert "maintainability_index" in result
             assert result["maintainability_index"] == 0.0
+            assert calculator.last_metric_statuses["maintainability_index"]["status"] == "failed"
+            assert "Test" in calculator.last_metric_statuses["maintainability_index"]["error"]
 
 
 def test_paradigm_detection_exception_falls_back_to_complexity():

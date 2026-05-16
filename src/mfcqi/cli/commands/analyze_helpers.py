@@ -57,10 +57,12 @@ def calculate_metrics(
             detailed_data = calculator.get_detailed_metrics_with_tool_outputs(paths[0])
             detailed_metrics = detailed_data.get("metrics", {})
             detailed_metrics["mfcqi_score"] = detailed_data.get("mfcqi_score", 0.0)
+            detailed_metrics["_metric_statuses"] = detailed_data.get("metric_statuses", {})
             tool_outputs = detailed_data.get("tool_outputs", {})
         else:
             progress.update(task, description="📊 Calculating metrics...")
-            detailed_metrics = calculator.get_detailed_metrics(paths[0])
+            detailed_metrics = dict(calculator.get_detailed_metrics(paths[0]))
+            detailed_metrics["_metric_statuses"] = getattr(calculator, "last_metric_statuses", {})
             tool_outputs = {}
 
         elapsed = time.time() - start_time
@@ -89,12 +91,16 @@ def _calculate_metrics_for_multiple_paths(
             detailed_data = calculator.get_detailed_metrics_with_tool_outputs(current_path)
             metrics = detailed_data.get("metrics", {})
             metrics["mfcqi_score"] = detailed_data.get("mfcqi_score", 0.0)
+            metrics["_metric_statuses"] = detailed_data.get("metric_statuses", {})
             _merge_tool_outputs(merged_tool_outputs, detailed_data.get("tool_outputs", {}))
         else:
-            metrics = calculator.get_detailed_metrics(current_path)
+            metrics = dict(calculator.get_detailed_metrics(current_path))
+            metrics["_metric_statuses"] = getattr(calculator, "last_metric_statuses", {})
         metric_sets.append(metrics)
 
-    return _average_metric_sets(metric_sets), merged_tool_outputs
+    averaged_metrics = _average_metric_sets(metric_sets)
+    averaged_metrics["_metric_statuses"] = _merge_metric_statuses(metric_sets)
+    return averaged_metrics, merged_tool_outputs
 
 
 def _average_metric_sets(metric_sets: Sequence[dict[str, Any]]) -> dict[str, Any]:
@@ -112,6 +118,20 @@ def _average_metric_sets(metric_sets: Sequence[dict[str, Any]]) -> dict[str, Any
             averaged[metric_name] = sum(values) / len(values)
 
     return averaged
+
+
+def _merge_metric_statuses(metric_sets: Sequence[dict[str, Any]]) -> dict[str, list[Any]]:
+    """Merge metric statuses collected from separate path analyses."""
+    merged: dict[str, list[Any]] = {}
+
+    for metrics in metric_sets:
+        statuses = metrics.get("_metric_statuses", {})
+        if not isinstance(statuses, dict):
+            continue
+        for metric_name, status in statuses.items():
+            merged.setdefault(metric_name, []).append(status)
+
+    return merged
 
 
 def _merge_tool_outputs(target: dict[str, Any], source: dict[str, Any]) -> None:
@@ -176,7 +196,12 @@ def prepare_analysis_result(detailed_metrics: dict[str, Any]) -> dict[str, Any]:
 
     return {
         "mfcqi_score": cqi_score,
-        "metric_scores": {k: v for k, v in detailed_metrics.items() if k != "mfcqi_score"},
+        "metric_scores": {
+            k: v
+            for k, v in detailed_metrics.items()
+            if k != "mfcqi_score" and not k.startswith("_")
+        },
+        "metric_statuses": detailed_metrics.get("_metric_statuses", {}),
         "diagnostics": [],
         "recommendations": [],
         "model_used": "metrics-only",
