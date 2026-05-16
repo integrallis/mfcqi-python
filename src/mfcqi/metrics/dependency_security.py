@@ -75,6 +75,7 @@ class DependencySecurityMetric(Metric):
             Weighted vulnerability count (0.0 = no vulnerabilities)
         """
         analyzer = PipAuditAnalyzer()
+        self.last_scan_errors: list[dict[str, str]] = []
 
         # Find ALL Python dependency files (ecosystem-wide)
         dependency_files: list[Path] = []
@@ -99,7 +100,10 @@ class DependencySecurityMetric(Metric):
         # Scan ALL dependency files using intelligent dispatcher
         weighted_vuln_count = 0.0
         for dep_file in dependency_files:
-            vulns = analyzer.scan_dependency_file(dep_file)
+            result = analyzer.scan_dependency_file_with_status(dep_file)
+            if not result.success:
+                self.last_scan_errors.append({"file": str(dep_file), "error": result.error})
+            vulns = result.vulnerabilities
 
             # For initial implementation, assign uniform weight per vulnerability
             # pip-audit doesn't provide severity directly, so we use moderate weight

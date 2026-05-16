@@ -69,3 +69,27 @@ requests==2.6.0
         assert "version" in vuln
         assert "vulnerability_id" in vuln
         assert vuln["package"] == "requests"
+
+
+def test_pip_audit_structured_scan_reports_failures(monkeypatch):
+    """Structured scans should distinguish scanner failure from clean results."""
+    from mfcqi.analysis.tools.pip_audit_analyzer import PipAuditAnalyzer
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        req_file = Path(tmpdir) / "requirements.txt"
+        req_file.write_text("requests==2.31.0")
+
+        analyzer = PipAuditAnalyzer()
+        if analyzer.auditor is None:
+            return
+
+        def raise_scan_error(_source):
+            raise RuntimeError("audit service unavailable")
+
+        monkeypatch.setattr(analyzer.auditor, "audit", raise_scan_error)
+
+        result = analyzer.scan_requirements_with_status(req_file)
+
+        assert result.success is False
+        assert result.vulnerabilities == []
+        assert "audit service unavailable" in result.error
