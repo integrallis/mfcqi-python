@@ -2,6 +2,7 @@
 Integration tests for CLI with different LLM providers.
 """
 
+import json
 import tempfile
 from pathlib import Path
 
@@ -75,6 +76,53 @@ def complex_function(x, y, z):
         )
         assert result.exit_code == 0
         # Should produce valid JSON output
+
+    def test_analyze_comma_separated_paths_json_output(self):
+        """Test analyze supports comma-separated path arguments."""
+        first_file = self.temp_dir / "first.py"
+        second_file = self.temp_dir / "second.py"
+        first_file.write_text("def first():\n    return 1\n")
+        second_file.write_text("def second():\n    return 2\n")
+
+        result = self.runner.invoke(
+            cli,
+            [
+                "analyze",
+                f"{first_file},{second_file}",
+                "--skip-llm",
+                "--format",
+                "json",
+            ],
+        )
+
+        assert result.exit_code == 0
+        output = json.loads(result.output)
+        assert "mfcqi_score" in output
+        assert "metrics" in output
+
+    def test_analyze_space_separated_paths_json_output(self):
+        """Test analyze supports multiple path arguments."""
+        first_file = self.temp_dir / "first.py"
+        second_file = self.temp_dir / "second.py"
+        first_file.write_text("def first():\n    return 1\n")
+        second_file.write_text("def second():\n    return 2\n")
+
+        result = self.runner.invoke(
+            cli,
+            [
+                "analyze",
+                str(first_file),
+                str(second_file),
+                "--skip-llm",
+                "--format",
+                "json",
+            ],
+        )
+
+        assert result.exit_code == 0
+        output = json.loads(result.output)
+        assert "mfcqi_score" in output
+        assert "metrics" in output
 
     def test_analyze_with_output_file(self):
         """Test analyze command with output file."""

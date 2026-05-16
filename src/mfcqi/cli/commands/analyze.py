@@ -21,8 +21,32 @@ from mfcqi.cli.utils.llm_handler import LLMHandler
 console = Console()
 
 
+def _parse_analysis_paths(raw_paths: tuple[str, ...]) -> list[Path]:
+    """Expand comma-separated CLI path arguments and validate each path."""
+    paths: list[Path] = []
+    for raw_path in raw_paths:
+        for path_part in raw_path.split(","):
+            path_text = path_part.strip()
+            if path_text:
+                path = Path(path_text)
+                if not path.exists():
+                    raise click.BadParameter(f"Path does not exist: {path_text}", param_hint="PATH")
+                paths.append(path)
+
+    if not paths:
+        raise click.BadParameter("At least one path is required", param_hint="PATH")
+
+    return paths
+
+
+def _quality_gate_config_root(paths: list[Path]) -> Path:
+    """Choose a stable location for resolving quality gate config files."""
+    first_path = paths[0]
+    return first_path if first_path.is_dir() else first_path.parent
+
+
 @click.command()
-@click.argument("path", type=click.Path(exists=True, path_type=Path))
+@click.argument("paths", nargs=-1, type=str, required=True)
 @click.option(
     "--model", help="Specific model to use (e.g., claude-3-5-sonnet, gpt-4o, ollama:codellama:7b)"
 )
@@ -49,7 +73,7 @@ console = Console()
 @click.pass_context
 def analyze(
     ctx: click.Context,
-    path: Path,
+    paths: tuple[str, ...],
     model: str | None,
     provider: str | None,
     skip_llm: bool,
@@ -78,11 +102,18 @@ def analyze(
     llm_handler = LLMHandler(config_manager, ollama_endpoint)
 
     calculator = MFCQICalculator()
+    analysis_paths = _parse_analysis_paths(paths)
+    analysis_target: Path | list[Path] = (
+        analysis_paths[0] if len(analysis_paths) == 1 else analysis_paths
+    )
+    analysis_path_label = (
+        str(analysis_paths[0]) if len(analysis_paths) == 1 else ", ".join(map(str, analysis_paths))
+    )
 
     # Calculate base metrics
     try:
         detailed_metrics, tool_outputs, _elapsed = calculate_metrics(
-            path,
+            analysis_target,
             calculator,
             need_tool_outputs=not should_skip_llm,
             silent=silent,
@@ -99,7 +130,7 @@ def analyze(
     if not should_skip_llm:
         try:
             llm_result = get_llm_recommendations(
-                str(path),
+                analysis_path_label,
                 detailed_metrics,
                 tool_outputs,
                 llm_handler,
@@ -133,7 +164,7 @@ def analyze(
         )
 
         # Find quality gate config
-        config_path = find_quality_gate_config(path)
+        config_path = find_quality_gate_config(_quality_gate_config_root(analysis_paths))
         if config_path:
             gate_config = QualityGateConfig.from_file(config_path)
         else:
