@@ -125,6 +125,58 @@ def test_scan_failures_are_recorded_separately():
         assert "Unsupported dependency file format" in metric.last_scan_errors[0]["error"]
 
 
+def test_dependency_security_caches_scan_results(monkeypatch):
+    """Test dependency scans are cached when dependency files do not change."""
+    from mfcqi.analysis.tools.pip_audit_analyzer import PipAuditScanResult
+    from mfcqi.metrics import dependency_security
+    from mfcqi.metrics.dependency_security import DependencySecurityMetric
+
+    class FakeAnalyzer:
+        calls = 0
+
+        def scan_dependency_file_with_status(self, _dep_file):
+            FakeAnalyzer.calls += 1
+            return PipAuditScanResult(vulnerabilities=[])
+
+    monkeypatch.setattr(dependency_security, "PipAuditAnalyzer", FakeAnalyzer)
+
+    metric = DependencySecurityMetric()
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        req_file = Path(tmpdir) / "requirements.txt"
+        req_file.write_text("requests==2.31.0\n")
+
+        assert metric.extract(Path(tmpdir)) == 0.0
+        assert metric.extract(Path(tmpdir)) == 0.0
+        assert FakeAnalyzer.calls == 1
+
+
+def test_dependency_security_records_scan_timeout(monkeypatch):
+    """Test dependency scans record timeout failures separately."""
+    import time
+
+    from mfcqi.analysis.tools.pip_audit_analyzer import PipAuditScanResult
+    from mfcqi.metrics import dependency_security
+    from mfcqi.metrics.dependency_security import DependencySecurityMetric
+
+    class SlowAnalyzer:
+        def scan_dependency_file_with_status(self, _dep_file):
+            time.sleep(0.05)
+            return PipAuditScanResult(vulnerabilities=[])
+
+    monkeypatch.setattr(dependency_security, "PipAuditAnalyzer", SlowAnalyzer)
+
+    metric = DependencySecurityMetric(scan_timeout=0.001)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        req_file = Path(tmpdir) / "requirements.txt"
+        req_file.write_text("requests==2.31.0\n")
+
+        assert metric.extract(Path(tmpdir)) == 0.0
+        assert metric.last_scan_errors
+        assert "timed out" in metric.last_scan_errors[0]["error"]
+
+
 def test_metric_weight():
     """Test that weight is 0.75 based on research."""
     from mfcqi.metrics.dependency_security import DependencySecurityMetric
