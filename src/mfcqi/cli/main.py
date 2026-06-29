@@ -19,7 +19,7 @@ warnings.filterwarnings("ignore", message="invalid escape sequence")
 
 
 @click.group()
-@click.version_option(version=__version__, prog_name="mfcqi")
+@click.version_option(version=__version__, prog_name="mfcqi-py")
 @click.option("--debug", is_flag=True, help="Enable debug mode")
 @click.pass_context
 def cli(ctx: Context, debug: bool) -> None:

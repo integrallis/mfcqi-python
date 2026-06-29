@@ -166,7 +166,7 @@ def get_llm_recommendations(
     if not selected_model:
         if not silent:
             console.print("i  Analysis complete (metrics-only mode - no LLM configured)")
-            console.print("💡 To get AI recommendations, run: mfcqi config setup")
+            console.print("💡 To get AI recommendations, run: mfcqi-py config setup")
         return None
 
     with Progress(

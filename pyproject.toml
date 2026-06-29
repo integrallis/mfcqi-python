@@ -58,17 +58,17 @@ dependencies = [
 ]
 
 [project.scripts]
-mfcqi = "mfcqi.cli.main:main"
+mfcqi-py = "mfcqi.cli.main:main"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project.urls]
-"Homepage" = "https://github.com/bsbodden/mfcqi"
-"Bug Reports" = "https://github.com/bsbodden/mfcqi/issues"
-"Source" = "https://github.com/bsbodden/mfcqi"
-"Documentation" = "https://mfcqi.readthedocs.io/"
+"Homepage" = "https://github.com/integrallis/mfcqi-python"
+"Bug Reports" = "https://github.com/integrallis/mfcqi-python/issues"
+"Source" = "https://github.com/integrallis/mfcqi-python"
+"Documentation" = "https://integrallis.github.io/mfcqi-python/"
 
 [dependency-groups]
 dev = [

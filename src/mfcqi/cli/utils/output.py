@@ -60,7 +60,7 @@ def format_sarif_output(analysis_result: dict[str, Any]) -> dict[str, Any]:
                     "driver": {
                         "name": "MFCQI",
                         "version": __version__,
-                        "informationUri": "https://github.com/bsbodden/mfcqi",
+                        "informationUri": "https://github.com/integrallis/mfcqi-python",
                         "semanticVersion": __version__,
                         "rules": _create_sarif_rules(metric_scores),
                     }
@@ -140,7 +140,7 @@ def _create_sarif_rules(metric_scores: dict[str, Any]) -> list[dict[str, Any]]:
                 "name": desc["name"],
                 "shortDescription": {"text": desc["shortDescription"]},
                 "fullDescription": {"text": desc["fullDescription"]},
-                "helpUri": "https://github.com/bsbodden/mfcqi",
+                "helpUri": "https://github.com/integrallis/mfcqi-python",
                 "properties": {"tags": ["code-quality", "metrics"]},
             }
         )
@@ -154,7 +154,7 @@ def _create_sarif_rules(metric_scores: dict[str, Any]) -> list[dict[str, Any]]:
             "fullDescription": {
                 "text": "Composite code quality score combining multiple evidence-based metrics using geometric mean."
             },
-            "helpUri": "https://github.com/bsbodden/mfcqi",
+            "helpUri": "https://github.com/integrallis/mfcqi-python",
             "properties": {"tags": ["code-quality", "composite"]},
         }
     )
@@ -383,7 +383,7 @@ def _add_metrics_only_message(elements: list[Union[Text, Table]]) -> None:
     """Add metrics-only mode message."""
     elements.append(Text())  # Empty line
     elements.append(Text("i  Analysis complete (metrics-only mode)", style="dim"))
-    elements.append(Text("💡 To get AI recommendations, run: mfcqi config setup", style="cyan"))
+    elements.append(Text("💡 To get AI recommendations, run: mfcqi-py config setup", style="cyan"))
 
 
 def _format_markdown_output(analysis_result: dict[str, Any]) -> str:

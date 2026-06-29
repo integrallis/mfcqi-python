@@ -14,7 +14,7 @@
 
    ```bash
    # Fork via GitHub UI, then:
-   git clone https://github.com/bsbodden/mfcqi.git
+   git clone https://github.com/integrallis/mfcqi-python.git
    cd mfcqi
    ```
 

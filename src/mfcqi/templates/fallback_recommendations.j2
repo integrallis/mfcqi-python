@@ -114,7 +114,7 @@
     "evidence": "Overall MFCQI score below optimal range",
     "solution": "1. Review metrics scoring below 0.7\n2. Run comprehensive analysis tools\n3. Set up continuous quality monitoring\n4. Establish coding standards\n5. Implement code review processes",
     "commands": [
-      "mfcqi analyze {{ codebase_path | default('.') }} --verbose",
+      "mfcqi-py analyze {{ codebase_path | default('.') }} --verbose",
       "pre-commit install",
       "tox -e quality"
     ],

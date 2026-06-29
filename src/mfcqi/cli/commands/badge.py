@@ -43,13 +43,13 @@ def badge(
 
     Examples:
         # Generate shields.io URL (static badge)
-        mfcqi badge
+        mfcqi-py badge
 
         # Generate JSON for shields.io endpoint
-        mfcqi badge -f json -o badge.json
+        mfcqi-py badge -f json -o badge.json
 
         # Generate markdown with instructions
-        mfcqi badge -f markdown
+        mfcqi-py badge -f markdown
     """
     # Calculate MFCQI score
     with console.status("[bold cyan]Calculating MFCQI score..."):

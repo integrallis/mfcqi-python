@@ -19,7 +19,7 @@ Add this to your README.md:
 
 ### Option 2: Badge with Link
 ```markdown
-[![MFCQI Score]({url})](https://github.com/bsbodden/mfcqi)
+[![MFCQI Score]({url})](https://github.com/integrallis/mfcqi-python)
 ```
 
 ### Option 3: Dynamic Badge via GitHub Actions
@@ -45,7 +45,7 @@ jobs:
 
       - name: Generate Badge JSON
         run: |
-          mfcqi badge . -f json -o .github/badges/mfcqi.json
+          mfcqi-py badge . -f json -o .github/badges/mfcqi.json
 
       - name: Commit Badge
         run: |
@@ -65,7 +65,7 @@ Then use in README:
 ```yaml
 - name: Check Code Quality
   run: |
-    SCORE=$(mfcqi analyze . --format json | jq -r .mfcqi)
+    SCORE=$(mfcqi-py analyze . --format json | jq -r .mfcqi)
     if (( $(echo "$SCORE < 0.7" | bc -l) )); then
       echo "Code quality score $SCORE is below threshold"
       exit 1

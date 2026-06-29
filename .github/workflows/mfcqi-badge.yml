@@ -53,7 +53,7 @@ jobs:
         echo "old_score=$OLD_SCORE" >> $GITHUB_OUTPUT
 
         # Calculate new score and save to JSON
-        uv run mfcqi badge src/mfcqi -f json -o .github/badges/mfcqi.json
+        uv run mfcqi-py badge src/mfcqi -f json -o .github/badges/mfcqi.json
 
         # Extract new score
         NEW_SCORE=$(python -c "import json; data=json.load(open('.github/badges/mfcqi.json')); print(data['message'].split()[0])")

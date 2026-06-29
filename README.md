@@ -1,13 +1,13 @@
 # MFCQI - Multi-Factor Code Quality Index
 
-[![MFCQI Score](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/bsbodden/mfcqi/main/.github/badges/mfcqi.json)](https://github.com/bsbodden/mfcqi)
+[![MFCQI Score](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/integrallis/mfcqi-python/main/.github/badges/mfcqi.json)](https://github.com/integrallis/mfcqi-python)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![PyPI version](https://badge.fury.io/py/mfcqi.svg)](https://pypi.org/project/mfcqi)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![codecov](https://codecov.io/gh/bsbodden/mfcqi/graph/badge.svg)](https://codecov.io/gh/bsbodden/mfcqi)
+[![codecov](https://codecov.io/gh/integrallis/mfcqi-python/graph/badge.svg)](https://codecov.io/gh/integrallis/mfcqi-python)
 ![Downloads](https://img.shields.io/pypi/dm/mfcqi)
 
-![logo](https://raw.githubusercontent.com/bsbodden/mfcqi/main/docs/mfcqi.png)
+![logo](https://raw.githubusercontent.com/integrallis/mfcqi-python/main/docs/mfcqi.png)
 
 **MFCQI** (Multi-Factor Code Quality Index) is a comprehensive code quality analysis tool that produces a single quality
 score (0.0-1.0) by combining multiple evidence-based metrics.
@@ -34,7 +34,7 @@ pip install mfcqi
 uv pip install mfcqi
 
 # For development (editable install)
-git clone https://github.com/bsbodden/mfcqi.git
+git clone https://github.com/integrallis/mfcqi-python.git
 cd mfcqi
 uv pip install -e .
 ```
@@ -43,35 +43,35 @@ uv pip install -e .
 
 ```bash
 # Analyze current directory (metrics only)
-mfcqi analyze .
+mfcqi-py analyze .
 
 # Analyze specific directory
-mfcqi analyze src/mfcqi
+mfcqi-py analyze src/mfcqi
 
 # Analyze a single file
-mfcqi analyze src/mfcqi/core/metric.py  
+mfcqi-py analyze src/mfcqi/core/metric.py  
 
 # Analyze with AI recommendations (uses your API keys)
-mfcqi analyze . --model claude-3-5-sonnet-20241022
+mfcqi-py analyze . --model claude-3-5-sonnet-20241022
 
 # Use local Ollama models
-mfcqi analyze . --model ollama:codellama:7b
+mfcqi-py analyze . --model ollama:codellama:7b
 
 # Generate more recommendations (default is 10)
-mfcqi analyze . --model claude-3-5-sonnet-20241022 --recommendations 15
+mfcqi-py analyze . --model claude-3-5-sonnet-20241022 --recommendations 15
 
 # Output JSON for CI/CD integration
-mfcqi analyze . --format json --output report.json
+mfcqi-py analyze . --format json --output report.json
 
 # Fail CI if quality is below threshold
-mfcqi analyze . --min-score 0.75
+mfcqi-py analyze . --min-score 0.75
 
 # Generate a badge for your project
 
-mfcqi badge .  # Shows shields.io URL
+mfcqi-py badge .  # Shows shields.io URL
 
 # Generate badge JSON for GitHub endpoint
-mfcqi badge . -f json -o .github/badges/mfcqi.json
+mfcqi-py badge . -f json -o .github/badges/mfcqi.json
 ```
 
 ### Badge Generation
@@ -80,13 +80,13 @@ MFCQI can generate quality badges for your README:
 
 ```bash
 # Generate a shields.io badge URL
-mfcqi badge .
+mfcqi-py badge .
 
 # Generate JSON for dynamic badges
-mfcqi badge . -f json -o badge.json
+mfcqi-py badge . -f json -o badge.json
 
 # Get markdown instructions
-mfcqi badge . -f markdown
+mfcqi-py badge . -f markdown
 ```
 
 The badge automatically uses color coding:
@@ -166,20 +166,20 @@ cp .env.example .env
 
 ```bash
 # Set up API keys using secure system keyring
-mfcqi config setup
+mfcqi-py config setup
 
 # Check provider status
-mfcqi config status
+mfcqi-py config status
 ```
 
 #### Managing Models
 
 ```bash
 # List available Ollama models
-mfcqi models list
+mfcqi-py models list
 
 # Pull new Ollama model
-mfcqi models pull llama3.2
+mfcqi-py models pull llama3.2
 ```
 
 ## Features
@@ -205,7 +205,7 @@ mfcqi models pull llama3.2
 - name: Check Code Quality
   run: |
     pip install mfcqi
-    mfcqi analyze src --min-score 0.7 --format json --output mfcqi-report.json
+    mfcqi-py analyze src --min-score 0.7 --format json --output mfcqi-report.json
 
 ```
 
@@ -262,7 +262,7 @@ The Security metric evaluates code vulnerability density using industry-standard
 
 ```bash
 # Clone repository
-git clone https://github.com/bsbodden/mfcqi.git
+git clone https://github.com/integrallis/mfcqi-python.git
 cd mfcqi
 
 # Set up environment variables (for LLM features)
@@ -317,7 +317,7 @@ Key metrics:
 Example cli usage:
 
 ```bash
-➜ mfcqi analyze src/mfcqi --model ollama:codellama:7b
+➜ mfcqi-py analyze src/mfcqi --model ollama:codellama:7b
 ⠦ ✅ Metrics calculated (MFCQI Score: 0.85) in 3.0s 0:00:03
 ⠧ ✅ AI recommendations generated
 ╭───────────────────────── ✨ MFCQI Analysis Results ──────────────────────────╮
@@ -466,9 +466,9 @@ MIT License - see [LICENSE](LICENSE) file for details.
 ## Links
 
 - [PyPI Package](https://pypi.org/project/mfcqi/)
-- [GitHub Repository](https://github.com/bsbodden/mfcqi)
-- [Documentation](https://mfcqi.readthedocs.io/)
-- [Issue Tracker](https://github.com/bsbodden/mfcqi/issues)
+- [GitHub Repository](https://github.com/integrallis/mfcqi-python)
+- [Documentation](https://integrallis.github.io/mfcqi-python/)
+- [Issue Tracker](https://github.com/integrallis/mfcqi-python/issues)
 
 ---
 
