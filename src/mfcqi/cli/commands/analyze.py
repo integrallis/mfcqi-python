@@ -70,6 +70,14 @@ def _quality_gate_config_root(paths: list[Path]) -> Path:
 @click.option(
     "--recommendations", type=int, default=50, help="Number of AI recommendations to generate"
 )
+@click.option(
+    "--parallelism",
+    type=click.IntRange(min=1),
+    default=1,
+    show_default=True,
+    envvar="MFCQI_PARALLELISM",
+    help="Maximum number of metrics to evaluate concurrently",
+)
 @click.pass_context
 def analyze(
     ctx: click.Context,
@@ -85,6 +93,7 @@ def analyze(
     quality_gate: bool,
     ollama_endpoint: str,
     recommendations: int,
+    parallelism: int,
 ) -> None:
     """Analyze codebase and generate quality recommendations."""
 
@@ -101,7 +110,7 @@ def analyze(
     config_manager = ConfigManager()
     llm_handler = LLMHandler(config_manager, ollama_endpoint)
 
-    calculator = MFCQICalculator()
+    calculator = MFCQICalculator(parallelism=parallelism)
     analysis_paths = _parse_analysis_paths(paths)
     analysis_target: Path | list[Path] = (
         analysis_paths[0] if len(analysis_paths) == 1 else analysis_paths

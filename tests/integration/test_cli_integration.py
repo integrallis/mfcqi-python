@@ -69,6 +69,55 @@ def complex_function(x, y, z):
         assert result.exit_code == 0
         # Should complete without requiring API keys
 
+    def test_analyze_parallelism_is_passed_to_calculator(self):
+        """Test analyze configures bounded metric execution."""
+        from unittest.mock import patch
+
+        with (
+            patch("mfcqi.cli.commands.analyze.MFCQICalculator") as calculator,
+            patch(
+                "mfcqi.cli.commands.analyze.calculate_metrics",
+                return_value=({"mfcqi_score": 0.8}, {}, 0.01),
+            ),
+        ):
+            result = self.runner.invoke(
+                cli,
+                ["analyze", str(self.temp_dir), "--skip-llm", "--parallelism", "4"],
+            )
+
+        assert result.exit_code == 0
+        calculator.assert_called_once_with(parallelism=4)
+
+    def test_analyze_rejects_non_positive_parallelism(self):
+        """Test analyze rejects invalid worker counts before analysis starts."""
+        result = self.runner.invoke(
+            cli,
+            ["analyze", str(self.temp_dir), "--skip-llm", "--parallelism", "0"],
+        )
+
+        assert result.exit_code == 2
+        assert "invalid value" in result.output.lower()
+
+    def test_analyze_parallelism_can_be_set_from_environment(self):
+        """Test automation can configure metric workers without changing CLI arguments."""
+        from unittest.mock import patch
+
+        with (
+            patch("mfcqi.cli.commands.analyze.MFCQICalculator") as calculator,
+            patch(
+                "mfcqi.cli.commands.analyze.calculate_metrics",
+                return_value=({"mfcqi_score": 0.8}, {}, 0.01),
+            ),
+        ):
+            result = self.runner.invoke(
+                cli,
+                ["analyze", str(self.temp_dir), "--skip-llm"],
+                env={"MFCQI_PARALLELISM": "3"},
+            )
+
+        assert result.exit_code == 0
+        calculator.assert_called_once_with(parallelism=3)
+
     def test_analyze_json_output(self):
         """Test analyze command with JSON output."""
         result = self.runner.invoke(

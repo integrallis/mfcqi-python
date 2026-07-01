@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### New Features
 - feat: Support analyzing a single Python file path (in addition to directories)
+- feat: Add bounded parallel metric evaluation via CLI option or environment variable
 
 ### Fixes
 - fix: Pass API key to LiteLLM

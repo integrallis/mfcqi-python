@@ -19,6 +19,8 @@ Core metrics include:
 """
 
 import logging
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -45,6 +47,16 @@ from mfcqi.smell_detection.pyexamine import PyExamineDetector
 logger = logging.getLogger(__name__)
 
 
+@dataclass(frozen=True)
+class _MetricEvaluation:
+    """Result returned by a metric worker without mutating calculator state."""
+
+    metric_name: str
+    raw_value: Any
+    normalized_value: float
+    error: str | None = None
+
+
 class MFCQICalculator:
     """Calculates MFCQI score using geometric mean of multiple metrics."""
 
@@ -52,13 +64,18 @@ class MFCQICalculator:
         self,
         use_paradigm_detection: bool = True,
         include_type_safety: bool = False,  # Include type annotation coverage
+        parallelism: int = 1,
     ):
         """Initialize calculator with core metrics.
 
         Args:
             use_paradigm_detection: Whether to use paradigm detection for metric selection
             include_type_safety: Whether to include type annotation coverage in MFCQI calculation
+            parallelism: Maximum number of metrics to evaluate concurrently
         """
+        if parallelism < 1:
+            raise ValueError("parallelism must be positive")
+
         # Core metrics that are always included
         self.core_metrics = {
             "cyclomatic_complexity": CyclomaticComplexity(),
@@ -94,6 +111,7 @@ class MFCQICalculator:
 
         self.include_type_safety = include_type_safety
         self.use_paradigm_detection = use_paradigm_detection
+        self.parallelism = parallelism
         self.paradigm_detector = ParadigmDetector() if use_paradigm_detection else None
 
         # Cache for metrics to avoid recreating them
@@ -123,31 +141,13 @@ class MFCQICalculator:
         # Determine final metrics based on complexity analysis
         final_metrics = self._determine_applicable_metrics(codebase)
 
-        # Extract and normalize all metrics
-        normalized_scores = []
-        self.last_metric_statuses = {}
-
-        for metric_name, metric in final_metrics.items():
-            try:
-                # Extract raw metric value
-                raw_value = metric.extract(codebase)
-
-                # Normalize to [0,1] range
-                normalized_value = metric.normalize(raw_value)
-
-                # Ensure bounds
-                normalized_value = max(0.0, min(1.0, normalized_value))
-
-                normalized_scores.append(normalized_value)
-                self._record_metric_status(metric_name, "ok", raw_value, normalized_value)
-
-            except Exception as e:
-                # If metric fails, use 0.0 (worst score)
-                normalized_scores.append(0.0)
-                self._record_metric_status(metric_name, "failed", None, 0.0, str(e))
+        evaluations = self._evaluate_metrics(codebase, final_metrics)
+        self._record_evaluations(evaluations)
 
         # Calculate geometric mean
-        return self._calculate_geometric_mean(normalized_scores)
+        return self._calculate_geometric_mean(
+            [evaluation.normalized_value for evaluation in evaluations]
+        )
 
     def _determine_applicable_metrics(self, codebase: Path) -> dict[str, Any]:
         """Determine which metrics to include based on paradigm detection or complexity."""
@@ -228,8 +228,7 @@ class MFCQICalculator:
         Returns:
             Dictionary with metric names and their normalized scores
         """
-        results = {}
-        self.last_metric_statuses = {}
+        results: dict[str, float] = {}
 
         if not codebase.exists() or (not codebase.is_dir() and not codebase.is_file()):
             # Return zeros for included metrics
@@ -241,20 +240,16 @@ class MFCQICalculator:
         # Determine applicable metrics (same logic as calculate method)
         applicable_metrics = self._determine_applicable_metrics(codebase)
 
-        # Calculate each applicable metric
-        for metric_name, metric in applicable_metrics.items():
-            try:
-                raw_value = metric.extract(codebase)
-                normalized_value = metric.normalize(raw_value)
-                normalized_value = max(0.0, min(1.0, normalized_value))
-                results[metric_name] = normalized_value
-                self._record_metric_status(metric_name, "ok", raw_value, normalized_value)
-            except Exception as e:
-                import logging
-
-                logging.warning(f"Failed to calculate metric {metric_name}: {e}")
-                results[metric_name] = 0.0
-                self._record_metric_status(metric_name, "failed", None, 0.0, str(e))
+        evaluations = self._evaluate_metrics(codebase, applicable_metrics)
+        self._record_evaluations(evaluations)
+        for evaluation in evaluations:
+            results[evaluation.metric_name] = evaluation.normalized_value
+            if evaluation.error is not None:
+                logger.warning(
+                    "Failed to calculate metric %s: %s",
+                    evaluation.metric_name,
+                    evaluation.error,
+                )
 
         # Calculate overall MFCQI score
         results["mfcqi_score"] = self._calculate_geometric_mean(
@@ -278,9 +273,53 @@ class MFCQICalculator:
         }
         if raw_value is not None:
             metric_status["raw_value"] = raw_value
-        if error:
+        if error is not None:
             metric_status["error"] = error
         self.last_metric_statuses[metric_name] = metric_status
+
+    def _evaluate_metrics(self, codebase: Path, metrics: dict[str, Any]) -> list[_MetricEvaluation]:
+        """Evaluate metrics serially or with a bounded worker pool."""
+        metric_items = list(metrics.items())
+        if self.parallelism == 1 or len(metric_items) <= 1:
+            return [
+                self._evaluate_metric(metric_name, metric, codebase)
+                for metric_name, metric in metric_items
+            ]
+
+        worker_count = min(self.parallelism, len(metric_items))
+        with ThreadPoolExecutor(
+            max_workers=worker_count,
+            thread_name_prefix="mfcqi-metric",
+        ) as executor:
+            futures = [
+                executor.submit(self._evaluate_metric, metric_name, metric, codebase)
+                for metric_name, metric in metric_items
+            ]
+            return [future.result() for future in futures]
+
+    @staticmethod
+    def _evaluate_metric(metric_name: str, metric: Any, codebase: Path) -> _MetricEvaluation:
+        """Extract and normalize one metric without mutating calculator state."""
+        try:
+            raw_value = metric.extract(codebase)
+            normalized_value = metric.normalize(raw_value)
+            bounded_value = max(0.0, min(1.0, normalized_value))
+            return _MetricEvaluation(metric_name, raw_value, bounded_value)
+        except Exception as exc:
+            return _MetricEvaluation(metric_name, None, 0.0, str(exc))
+
+    def _record_evaluations(self, evaluations: list[_MetricEvaluation]) -> None:
+        """Record worker results in deterministic metric registration order."""
+        self.last_metric_statuses = {}
+        for evaluation in evaluations:
+            status = "failed" if evaluation.error is not None else "ok"
+            self._record_metric_status(
+                evaluation.metric_name,
+                status,
+                evaluation.raw_value,
+                evaluation.normalized_value,
+                evaluation.error,
+            )
 
     def get_detailed_metrics_with_tool_outputs(self, codebase: Path) -> dict[str, Any]:
         """Get detailed metrics WITH raw tool outputs for LLM context.
@@ -303,40 +342,35 @@ class MFCQICalculator:
         # Determine applicable metrics
         applicable_metrics = self._determine_applicable_metrics(codebase)
 
-        # Calculate each metric AND collect tool outputs
-        self.last_metric_statuses = {}
-        for metric_name, metric in applicable_metrics.items():
-            try:
-                raw_value = metric.extract(codebase)
-                normalized_value = metric.normalize(raw_value)
-                results[metric_name] = max(0.0, min(1.0, normalized_value))
-                self._record_metric_status(metric_name, "ok", raw_value, results[metric_name])
+        evaluations = self._evaluate_metrics(codebase, applicable_metrics)
+        self._record_evaluations(evaluations)
+        for evaluation in evaluations:
+            metric_name = evaluation.metric_name
+            metric = applicable_metrics[metric_name]
+            results[metric_name] = evaluation.normalized_value
 
-                # Get the actual Bandit issues if available for security metric
-                if (
-                    metric_name == "security"
-                    and hasattr(metric, "last_issues")
-                    and metric.last_issues
-                ):
-                    tool_outputs["bandit_issues"] = metric.last_issues
+            if evaluation.error is not None:
+                logger.debug(
+                    "Metric '%s' extraction failed: %s. Using 0.0",
+                    metric_name,
+                    evaluation.error,
+                )
+                continue
 
-                # Store raw values for context (moved outside of security check)
-                if (
-                    metric_name == "cyclomatic_complexity"
-                    or metric_name == "halstead_volume"
-                    or metric_name == "cognitive_complexity"
-                ):
-                    tool_outputs[f"{metric_name}_raw"] = raw_value
+            # Get the actual Bandit issues if available for security metric
+            if metric_name == "security" and hasattr(metric, "last_issues") and metric.last_issues:
+                tool_outputs["bandit_issues"] = metric.last_issues
 
-                    # Collect detailed function-level complexity data
-                    if metric_name == "cyclomatic_complexity":
-                        tool_outputs["complex_functions"] = self._get_complex_functions(codebase)
+            # Store raw values for context
+            if metric_name in {
+                "cyclomatic_complexity",
+                "halstead_volume",
+                "cognitive_complexity",
+            }:
+                tool_outputs[f"{metric_name}_raw"] = evaluation.raw_value
 
-            except Exception as e:
-                # Log metric extraction failure (graceful degradation to 0.0)
-                logger.debug(f"Metric '{metric_name}' extraction failed: {e}. Using 0.0")
-                results[metric_name] = 0.0
-                self._record_metric_status(metric_name, "failed", None, 0.0, str(e))
+                if metric_name == "cyclomatic_complexity":
+                    tool_outputs["complex_functions"] = self._get_complex_functions(codebase)
 
         # Calculate overall score
         mfcqi_score = self._calculate_geometric_mean(

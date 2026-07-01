@@ -5,7 +5,50 @@ This test MUST fail first because the code doesn't exist yet.
 
 import tempfile
 import textwrap
+import threading
 from pathlib import Path
+
+
+class _FixedMetric:
+    def __init__(self, raw_value: float):
+        self.raw_value = raw_value
+
+    def extract(self, codebase: Path) -> float:
+        return self.raw_value
+
+    def normalize(self, value: float) -> float:
+        return value
+
+
+class _FailingMetric:
+    def extract(self, codebase: Path) -> float:
+        raise RuntimeError("metric failed")
+
+    def normalize(self, value: float) -> float:
+        return value
+
+
+class _EmptyMessageFailingMetric(_FailingMetric):
+    def extract(self, codebase: Path) -> float:
+        raise RuntimeError
+
+
+class _BarrierMetric(_FixedMetric):
+    def __init__(self, barrier: threading.Barrier, thread_ids: set[int]):
+        super().__init__(0.8)
+        self.barrier = barrier
+        self.thread_ids = thread_ids
+
+    def extract(self, codebase: Path) -> float:
+        self.thread_ids.add(threading.get_ident())
+        self.barrier.wait(timeout=2)
+        return self.raw_value
+
+
+class _SecurityMetric(_FixedMetric):
+    def extract(self, codebase: Path) -> float:
+        self.last_issues = [{"filename": "service.py", "line_number": 7}]
+        return self.raw_value
 
 
 def test_mfcqi_calculator_exists():
@@ -21,6 +64,94 @@ def test_mfcqi_calculator_initialization():
 
     calculator = MFCQICalculator()
     assert calculator is not None
+
+
+def test_parallelism_defaults_to_serial_and_must_be_positive():
+    """Parallel metric execution is opt-in and rejects invalid worker counts."""
+    import pytest
+
+    from mfcqi.calculator import MFCQICalculator
+
+    assert MFCQICalculator().parallelism == 1
+    with pytest.raises(ValueError, match="parallelism must be positive"):
+        MFCQICalculator(parallelism=0)
+
+
+def test_parallel_metrics_match_serial_results_and_preserve_order(tmp_path):
+    """Parallel evaluation preserves scores, statuses, failures, and registration order."""
+    from mfcqi.calculator import MFCQICalculator
+
+    (tmp_path / "sample.py").write_text("def sample():\n    return 1\n")
+    metrics = {
+        "first": _FixedMetric(0.8),
+        "failed": _FailingMetric(),
+        "empty_failed": _EmptyMessageFailingMetric(),
+        "third": _FixedMetric(1.2),
+    }
+
+    serial = MFCQICalculator(parallelism=1)
+    serial._cached_codebase = tmp_path
+    serial._cached_metrics = metrics
+    parallel = MFCQICalculator(parallelism=4)
+    parallel._cached_codebase = tmp_path
+    parallel._cached_metrics = metrics
+
+    serial_result = serial.get_detailed_metrics(tmp_path)
+    parallel_result = parallel.get_detailed_metrics(tmp_path)
+
+    assert parallel_result == serial_result
+    assert list(parallel_result) == [
+        "first",
+        "failed",
+        "empty_failed",
+        "third",
+        "mfcqi_score",
+    ]
+    assert parallel.last_metric_statuses == serial.last_metric_statuses
+    assert parallel.last_metric_statuses["failed"]["error"] == "metric failed"
+    assert parallel.last_metric_statuses["empty_failed"]["status"] == "failed"
+    assert parallel.last_metric_statuses["empty_failed"]["error"] == ""
+
+
+def test_parallel_metrics_execute_concurrently(tmp_path):
+    """A worker is allocated per metric up to the configured bound."""
+    from mfcqi.calculator import MFCQICalculator
+
+    (tmp_path / "sample.py").write_text("x = 1\n")
+    barrier = threading.Barrier(3)
+    thread_ids: set[int] = set()
+    metrics = {name: _BarrierMetric(barrier, thread_ids) for name in ("first", "second", "third")}
+    calculator = MFCQICalculator(parallelism=3)
+    calculator._cached_codebase = tmp_path
+    calculator._cached_metrics = metrics
+
+    calculator.get_detailed_metrics(tmp_path)
+
+    assert len(thread_ids) == 3
+
+
+def test_parallel_tool_outputs_are_collected_after_workers_complete(tmp_path):
+    """State populated by a metric worker remains available for LLM tool output."""
+    from unittest.mock import patch
+
+    from mfcqi.calculator import MFCQICalculator
+
+    (tmp_path / "sample.py").write_text("def sample():\n    return 1\n")
+    security = _SecurityMetric(0.9)
+    metrics = {
+        "cyclomatic_complexity": _FixedMetric(0.8),
+        "security": security,
+    }
+    calculator = MFCQICalculator(parallelism=2)
+    calculator._cached_codebase = tmp_path
+    calculator._cached_metrics = metrics
+
+    with patch.object(calculator, "_get_complex_functions", return_value=[{"name": "sample"}]):
+        result = calculator.get_detailed_metrics_with_tool_outputs(tmp_path)
+
+    assert result["tool_outputs"]["bandit_issues"] == security.last_issues
+    assert result["tool_outputs"]["cyclomatic_complexity_raw"] == 0.8
+    assert result["tool_outputs"]["complex_functions"] == [{"name": "sample"}]
 
 
 def test_calculate_simple_codebase():

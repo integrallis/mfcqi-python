@@ -63,6 +63,10 @@ mfcqi-py analyze . --model claude-3-5-sonnet-20241022 --recommendations 15
 # Output JSON for CI/CD integration
 mfcqi-py analyze . --format json --output report.json
 
+# Evaluate independent metrics concurrently (serial by default)
+mfcqi-py analyze . --skip-llm --parallelism 4
+# Automation can use MFCQI_PARALLELISM=4 instead.
+
 # Fail CI if quality is below threshold
 mfcqi-py analyze . --min-score 0.75
 
