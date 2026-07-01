@@ -84,7 +84,7 @@ jobs:
         MFCQI_DISABLE_KEYRING: "1"
       run: |
         echo "📊 Running MFCQI analysis on itself..."
-        MFCQI_SCORE=$(uv run mfcqi analyze src/mfcqi --format json --silent | python -c "
+        MFCQI_SCORE=$(uv run mfcqi-py analyze src/mfcqi --format json --silent | python -c "
         import sys, json
         try:
             data = json.load(sys.stdin)
@@ -115,7 +115,7 @@ jobs:
         MFCQI_DISABLE_KEYRING: "1"
       run: |
         echo "📊 Running MFCQI analysis on itself..."
-        MFCQI_SCORE=$(uv run mfcqi analyze src/mfcqi --format json --silent | python -c "import sys, json; data = json.load(sys.stdin); print(data.get('mfcqi_score', 0.0))")
+        MFCQI_SCORE=$(uv run mfcqi-py analyze src/mfcqi --format json --silent | python -c "import sys, json; data = json.load(sys.stdin); print(data.get('mfcqi_score', 0.0))")
         echo "Current MFCQI Score: $MFCQI_SCORE"
         echo "✅ MFCQI analysis complete"
 
@@ -170,7 +170,7 @@ jobs:
         echo "📊 Generating comprehensive quality report..."
 
         # Get MFCQI score
-        MFCQI_OUTPUT=$(uv run mfcqi analyze src/mfcqi --format json)
+        MFCQI_OUTPUT=$(uv run mfcqi-py analyze src/mfcqi --format json)
         MFCQI_SCORE=$(echo "$MFCQI_OUTPUT" | python -c "import sys, json; data=json.load(sys.stdin); print(data['mfcqi_score'])")
 
         # Get test coverage from artifact (avoid re-running tests)
