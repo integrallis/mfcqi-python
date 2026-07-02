@@ -180,7 +180,7 @@ jobs:
 
       - name: Verify CLI works
         run: |
-          mfcqi --version
+          mfcqi-py --version
           echo "✅ CLI executable works"
 
       - name: Install test dependencies
@@ -212,7 +212,7 @@ jobs:
           MFCQI_DISABLE_KEYRING: "1"
         run: |
           # Verify MFCQI can analyze code
-          mfcqi analyze src/mfcqi --format json --silent > /tmp/mfcqi_test.json
+          mfcqi-py analyze src/mfcqi --format json --silent > /tmp/mfcqi_test.json
 
           # Verify output is valid JSON
           python -c "import json; data = json.load(open('/tmp/mfcqi_test.json')); print(f\"MFCQI Score: {data['mfcqi_score']}\")"

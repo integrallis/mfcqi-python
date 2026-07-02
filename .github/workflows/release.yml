@@ -298,6 +298,7 @@ jobs:
           script: |
             const version = process.env.VERSION;
             const packageName = 'mfcqi';
+            const commandName = 'mfcqi-py';
 
             // Get the release (either from the release event or find by tag)
             let release;
@@ -332,7 +333,7 @@ jobs:
 
             \`\`\`bash
             pip install ${packageName}
-            ${packageName} analyze .
+            ${commandName} analyze .
             \`\`\`
 
             ### What's New in v${version}

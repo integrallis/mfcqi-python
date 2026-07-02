@@ -229,7 +229,7 @@ jobs:
           <details>
           <summary>📊 View detailed MFCQI breakdown</summary>
 
-          Run \`mfcqi analyze src/mfcqi\` locally to see detailed metrics breakdown.
+          Run \`mfcqi-py analyze src/mfcqi\` locally to see detailed metrics breakdown.
           </details>
           `;
 
