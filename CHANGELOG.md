@@ -4,14 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-### New Features
-- feat: Support analyzing a single Python file path (in addition to directories)
-- feat: Add bounded parallel metric evaluation via CLI option or environment variable
+## [0.0.6] - 2026-07-01
 
-### Fixes
-- fix: Pass API key to LiteLLM
-- fix: Allow unknown models to fall through to provider
-- fix: Add gpt-5 and gpt-5-mini model aliases
+### Breaking Changes
+- Rename the installed CLI from `mfcqi` to `mfcqi-py`
+- Move the project to `integrallis/mfcqi-python`
 
-### Changed
-- docs: README updated with single-file usage example
+### Added
+- Add bounded parallel metric evaluation via `--parallelism` or `MFCQI_PARALLELISM`
+- Publish a runnable CLI container image to GitHub Container Registry
+- Add the GitHub Pages documentation site
+
+### Fixed
+- Update CI and release validation to invoke the renamed Python CLI
